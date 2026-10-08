@@ -102,6 +102,44 @@
   #playBtn:active { transform: translateY(-2px); }
   #playBtn:disabled { background: #333; border-color: #555; color: #888; box-shadow: none; }
 
+  /* ============ ACCOUNT PANEL ============ */
+  #accountPanel {
+    width: 320px; max-width: 90vw; margin: 0 auto 20px; padding: 14px;
+    background: rgba(15,25,45,0.85); border: 2px solid rgba(90,150,220,0.4);
+    border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  }
+  #accountPanel h3 { margin: 0 0 10px; font-size: 14px; color: #8af; letter-spacing: 2px; }
+  #accountPanel input {
+    width: 100%; box-sizing: border-box; padding: 9px 10px; margin: 4px 0;
+    background: rgba(0,0,0,0.5); border: 2px solid rgba(90,150,220,0.35);
+    border-radius: 6px; color: #fff; font: 14px monospace; outline: none;
+  }
+  #accountPanel input:focus { border-color: #4a9eff; }
+  #accountPanel .btns { display: flex; gap: 8px; margin-top: 8px; }
+  #accountPanel button {
+    flex: 1; padding: 10px; border-radius: 6px; cursor: pointer;
+    font: bold 13px monospace; letter-spacing: 1px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #loginBtn { background: #4a9eff; border: 2px solid #8cf; color: #fff; }
+  #registerBtn { background: #2a6ecf; border: 2px solid #5a8edf; color: #fff; }
+  #skipBtn { background: transparent; border: 2px solid #555; color: #aaa;
+             width: 100%; margin-top: 8px; padding: 8px; font: 12px monospace; }
+  #accountMsg { margin-top: 8px; font-size: 12px; min-height: 16px; }
+  #accountMsg.error { color: #ff6b6b; }
+  #accountMsg.ok { color: #4bea8b; }
+  #loggedInBox {
+    display: none; width: 320px; max-width: 90vw; margin: 0 auto 20px;
+    padding: 12px; background: rgba(30,80,50,0.35);
+    border: 2px solid rgba(75,234,139,0.5); border-radius: 12px;
+    color: #fff; font: 13px monospace;
+  }
+  #loggedInBox .userRow { display: flex; justify-content: space-between; margin: 4px 0; }
+  #loggedInBox .uname { color: #4bea8b; font-weight: bold; }
+  #logoutBtn { margin-top: 8px; padding: 6px 16px; background: transparent;
+               border: 2px solid #666; color: #ccc; border-radius: 6px;
+               font: 11px monospace; cursor: pointer; }
+
   #mobileControls { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 50; }
   #mobileControls.active { display: block; }
   #joyBase {
@@ -164,6 +202,28 @@
 <div id="home">
   <h1>BLOCKY SHOOTER</h1>
   <div class="subtitle">SELECT PLATFORM & MAP</div>
+
+  <!-- ======== ACCOUNT PANEL ======== -->
+  <div id="accountPanel">
+    <h3>ACCOUNT</h3>
+    <input id="usernameInput" type="text" placeholder="username" autocomplete="username" maxlength="20">
+    <input id="passwordInput" type="password" placeholder="password" autocomplete="current-password" maxlength="40">
+    <div class="btns">
+      <button id="loginBtn">LOGIN</button>
+      <button id="registerBtn">REGISTER</button>
+    </div>
+    <button id="skipBtn">Skip — play as guest</button>
+    <div id="accountMsg"></div>
+  </div>
+
+  <!-- shown after login -->
+  <div id="loggedInBox">
+    <div class="userRow"><span>PLAYER</span><span class="uname" id="loggedInName">—</span></div>
+    <div class="userRow"><span>HIGH SCORE</span><span id="loggedInHigh">0</span></div>
+    <div class="userRow"><span>GAMES</span><span id="loggedInGames">0</span></div>
+    <button id="logoutBtn">LOGOUT</button>
+  </div>
+  <!-- ================================= -->
 
   <h2>PLATFORM</h2>
   <div class="row" id="platformRow">
@@ -237,7 +297,8 @@
 
 <div id="dead">
   <h1>YOU DIED</h1>
-  <p>Refresh to restart</p>
+  <p id="deadScore">Score: 0</p>
+  <p id="deadSave" style="font-size:14px; color:#8ab;"></p>
   <button onclick="location.reload()">BACK TO MENU</button>
 </div>
 
@@ -248,6 +309,112 @@
 <script>
 // ================= GAME CONFIG =================
 const CONFIG = { platform: 'pc', mapKey: 'bomb' };
+
+// ================= ACCOUNT STATE =================
+const Account = {
+  token: localStorage.getItem('bs_token') || null,
+  user: null,
+};
+
+function authHeaders() {
+  return Account.token ? { 'Authorization': 'Bearer ' + Account.token } : {};
+}
+
+async function apiCall(path, body) {
+  const opts = { method: body ? 'POST' : 'GET', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function setAccountMsg(text, isError) {
+  const el = document.getElementById('accountMsg');
+  el.textContent = text;
+  el.className = isError ? 'error' : 'ok';
+}
+
+function showLoggedIn() {
+  document.getElementById('accountPanel').style.display = 'none';
+  const box = document.getElementById('loggedInBox');
+  box.style.display = 'block';
+  document.getElementById('loggedInName').textContent = Account.user.username;
+  document.getElementById('loggedInHigh').textContent = Account.user.highScore || 0;
+  document.getElementById('loggedInGames').textContent = Account.user.gamesPlayed || 0;
+}
+function showLoggedOut() {
+  document.getElementById('accountPanel').style.display = 'block';
+  document.getElementById('loggedInBox').style.display = 'none';
+}
+
+async function doLogin() {
+  const u = document.getElementById('usernameInput').value.trim();
+  const p = document.getElementById('passwordInput').value;
+  if (!u || !p) return setAccountMsg('Enter username and password', true);
+  setAccountMsg('Logging in...', false);
+  try {
+    const data = await apiCall('/api/login', { username: u, password: p });
+    Account.token = data.token;
+    Account.user = data.user;
+    localStorage.setItem('bs_token', data.token);
+    setAccountMsg('Welcome back, ' + data.user.username, false);
+    showLoggedIn();
+  } catch (e) {
+    setAccountMsg(e.message, true);
+  }
+}
+
+async function doRegister() {
+  const u = document.getElementById('usernameInput').value.trim();
+  const p = document.getElementById('passwordInput').value;
+  if (!u || !p) return setAccountMsg('Enter username and password', true);
+  if (p.length < 4) return setAccountMsg('Password must be 4+ characters', true);
+  setAccountMsg('Creating account...', false);
+  try {
+    const data = await apiCall('/api/register', { username: u, password: p });
+    Account.token = data.token;
+    Account.user = data.user;
+    localStorage.setItem('bs_token', data.token);
+    setAccountMsg('Account created!', false);
+    showLoggedIn();
+  } catch (e) {
+    setAccountMsg(e.message, true);
+  }
+}
+
+async function doLogout() {
+  try { await apiCall('/api/logout', {}); } catch (e) {}
+  Account.token = null;
+  Account.user = null;
+  localStorage.removeItem('bs_token');
+  showLoggedOut();
+  setAccountMsg('Logged out', false);
+}
+
+async function submitScore(finalScore, kills) {
+  if (!Account.token) return;
+  try {
+    const data = await apiCall('/api/score', { score: finalScore, kills: kills });
+    if (Account.user) Account.user.highScore = data.highScore;
+    document.getElementById('deadSave').textContent = '✓ Score saved — high score: ' + data.highScore;
+  } catch (e) {
+    document.getElementById('deadSave').textContent = 'Could not save score: ' + e.message;
+  }
+}
+
+async function tryAutoLogin() {
+  if (!Account.token) return showLoggedOut();
+  try {
+    const data = await apiCall('/api/load');
+    Account.user = data.user;
+    showLoggedIn();
+  } catch (e) {
+    Account.token = null;
+    localStorage.removeItem('bs_token');
+    showLoggedOut();
+  }
+}
 
 // ================= SOUND ENGINE =================
 const Audio = (function() {
@@ -721,28 +888,20 @@ const player = {
 const GRAVITY = 30, JUMP_VELOCITY = 11;
 
 // ================= NAMETAGS =================
-// A sprite that always faces the camera, showing text above a character.
 function makeNametag(text, color) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = 256; canvas.height = 64;
-
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(4, 12, 248, 40, 10);
   else ctx.rect(4, 12, 248, 40);
   ctx.fill();
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
   ctx.font = 'bold 26px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
   ctx.fillText(text, 128, 33);
-
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = THREE.LinearFilter;
@@ -751,8 +910,6 @@ function makeNametag(text, color) {
   sprite.scale.set(1.6, 0.4, 1);
   return sprite;
 }
-
-// A small health bar sprite that shrinks as the enemy takes damage.
 function makeHealthBar() {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -769,18 +926,13 @@ function redrawHealthBar(sprite, ratio) {
   const ctx = sprite.userData.ctx;
   const w = 128, h = 24;
   ctx.clearRect(0, 0, w, h);
-  // black bg
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(0, 0, w, h);
-  // hp fill
   const r = Math.max(0, Math.min(1, ratio));
-  // color shifts green->yellow->red as hp drops
   const color = r > 0.6 ? '#2ecc71' : r > 0.3 ? '#f39c12' : '#e74c3c';
   ctx.fillStyle = color;
   ctx.fillRect(3, 3, (w - 6) * r, h - 6);
-  // border
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
   ctx.strokeRect(1, 1, w - 2, h - 2);
   sprite.userData.tex.needsUpdate = true;
 }
@@ -1113,13 +1265,11 @@ function buildSoldierRig(opts) {
   weapon.position.set(0.35, -0.35, -0.25); weapon.rotation.y = 0.15;
   armRPivot.add(weapon);
 
-  // NAMETAG above head
   const tagColor = opts.teamColor || '#ff4444';
   const nametag = makeNametag(opts.tagText || 'SOLDIER', tagColor);
   nametag.position.y = 2.85 * scale;
   g.add(nametag);
 
-  // HEALTH BAR above nametag
   const healthBar = makeHealthBar();
   healthBar.position.y = 2.55 * scale;
   redrawHealthBar(healthBar, 1);
@@ -1342,10 +1492,12 @@ function setupMobileControls() {
 // ================= STATE =================
 let score = 0, shakeT = 0, lastShot = 0;
 let footstepT = 0, wasOnGround = true;
+let killsThisGame = 0;
 const clock = new THREE.Clock();
 const zoomVignette = document.getElementById('zoomVignette');
 let gameStarted = false;
 let running = false;
+let scoreSaved = false;
 
 // ================= MINIMAP =================
 const minimap = document.getElementById('minimap');
@@ -1416,13 +1568,13 @@ function damageEnemy(e, dmg, hitDir, fromSniper, hitPos) {
   if (hitPos) { bloodBurst(hitPos, 6); sparkBurst(hitPos, 4); }
   Audio.enemyHit();
   e.memoryT = 3; e.lastSeen.copy(player.pos);
-  // update health bar
   if (e.healthBar) redrawHealthBar(e.healthBar, e.hp / e.maxHp);
   if (e.hp <= 0) { e.killedBySniper = fromSniper; killEnemy(e, hitDir); }
 }
 function killEnemy(e, impulseDir) {
   if (e.dead) return;
   e.dead = true;
+  killsThisGame++;
   score += e.def ? e.def.scoreValue : 10;
   bloodBurst(e.group.position.clone().add(new THREE.Vector3(0,1.2,0)), 22);
   burst(e.group.position.clone().add(new THREE.Vector3(0,1.2,0)), 0xff2222, 14);
@@ -1470,6 +1622,8 @@ function startGame() {
   spawnAlly();
   spawnTimer = SPAWN_DELAY;
   score = 0;
+  killsThisGame = 0;
+  scoreSaved = false;
   document.getElementById('score').textContent = '0';
 
   gameStarted = true;
@@ -1510,11 +1664,26 @@ function startGame() {
   function updatePlayState() { playBtn.disabled = !CONFIG.platform || !CONFIG.mapKey; }
   updatePlayState();
 
+  // ---- account buttons ----
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  document.getElementById('registerBtn').addEventListener('click', doRegister);
+  document.getElementById('logoutBtn').addEventListener('click', doLogout);
+  document.getElementById('skipBtn').addEventListener('click', function() {
+    document.getElementById('accountPanel').style.display = 'none';
+  });
+  // allow Enter key to log in
+  document.getElementById('passwordInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+
   playBtn.addEventListener('click', function() {
     Audio.init(); Audio.resume(); Audio.startAmbient();
     if (CONFIG.platform === 'mobile') setupMobileControls();
     startGame();
   });
+
+  // auto-login if token exists
+  tryAutoLogin();
 })();
 
 // POINTER LOCK (PC)
@@ -1560,7 +1729,6 @@ function loop() {
   const weapon = WEAPONS[currentWeapon];
   const isMobile = CONFIG.platform === 'mobile';
 
-  // ---- nametags + health bars: fade by distance, hide through walls ----
   const allTagged = enemies.concat(ally && !ally.dead ? [ally] : []);
   const tmpWp = new THREE.Vector3();
   for (const c of allTagged) {
@@ -1585,7 +1753,6 @@ function loop() {
     }
   }
 
-  // movement
   const forward = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
   const right = new THREE.Vector3(forward.z, 0, -forward.x);
   const move = new THREE.Vector3();
@@ -1659,7 +1826,6 @@ function loop() {
     weaponModels[weapon.id].position.y = bob * 0.5;
   }
 
-  // shooting
   lastShot += dt;
   const firing = isMobile ? mobile.fireHeld : mouseDown;
   if (firing && lastShot >= weapon.fireRate) {
@@ -1684,7 +1850,6 @@ function loop() {
   }
   muzzle.intensity = Math.max(0, muzzle.intensity - dt * 30);
 
-  // player bullets
   for (const b of bullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -1705,7 +1870,6 @@ function loop() {
       }
     }
   }
-  // ally bullets
   for (const b of allyBullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -1723,7 +1887,6 @@ function loop() {
       }
     }
   }
-  // enemy bullets
   for (const b of eBullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -1746,7 +1909,6 @@ function loop() {
       }
     }
   }
-  // grenades
   for (let i = liveGrenades.length - 1; i >= 0; i--) {
     const gr = liveGrenades[i];
     gr.mesh.position.add(gr.vel.clone().multiplyScalar(dt));
@@ -1768,7 +1930,6 @@ function loop() {
     if (gr.fuse <= 0) { explode(gr.mesh.position.clone()); scene.remove(gr.mesh); liveGrenades.splice(i, 1); }
   }
 
-  // ENEMY AI
   for (const e of enemies) {
     if (e.dead) continue;
     const def = e.def;
@@ -1892,7 +2053,6 @@ function loop() {
     }
   }
 
-  // ALLY AI
   if (ally && !ally.dead) {
     const a = ally;
     let ag = 0;
@@ -1987,13 +2147,11 @@ function loop() {
     if (statusEl) { statusEl.textContent = a.status; statusEl.style.color = a.status === 'ENGAGED' ? '#ff8' : '#6af'; }
     const hpEl = document.getElementById('allyHp-0');
     if (hpEl) hpEl.style.width = Math.max(0, a.hp / a.maxHp * 100) + '%';
-    // ally health bar on their model
     if (a.healthBar) redrawHealthBar(a.healthBar, a.hp / a.maxHp);
   }
 
   updateCorpses(dt);
 
-  // particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
@@ -2006,7 +2164,6 @@ function loop() {
     }
     if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
   }
-  // cleanup
   for (let i = bullets.length - 1; i >= 0; i--)
     if (bullets[i].life <= 0) { scene.remove(bullets[i].mesh); bullets.splice(i, 1); }
   for (let i = allyBullets.length - 1; i >= 0; i--)
@@ -2023,6 +2180,12 @@ function loop() {
   document.getElementById('hpfill').style.width = Math.max(0, player.hp) + '%';
   if (player.hp <= 0) {
     document.getElementById('dead').style.display = 'flex';
+    document.getElementById('deadScore').textContent = 'Score: ' + score;
+    if (!scoreSaved) {
+      scoreSaved = true;
+      document.getElementById('deadSave').textContent = Account.token ? 'Saving score...' : 'Log in to save your score';
+      if (Account.token) submitScore(score, killsThisGame);
+    }
     running = false;
     if (CONFIG.platform === 'pc') document.exitPointerLock();
   }
