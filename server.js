@@ -1,4 +1,4 @@
-'use strict
+'use strict';
 process.on('uncaughtException', (e) => { console.error('CRASH:', e && e.stack || e); process.exit(1); });
 process.on('unhandledRejection', (e) => { console.error('REJECT:', e && e.stack || e); process.exit(1); });
 // ============================================================
