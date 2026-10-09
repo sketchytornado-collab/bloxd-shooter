@@ -1,97 +1,77 @@
 'use strict';
-process.on('uncaughtException', (e) => { console.error('CRASH:', e && e.stack || e); process.exit(1); });
-process.on('unhandledRejection', (e) => { console.error('REJECT:', e && e.stack || e); process.exit(1); });
+process.on('uncaughtException', (e) => { console.error('CRASH:', e && e.stack || e); });
+process.on('unhandledRejection', (e) => { console.error('REJECT:', e && e.stack || e); });
+
 // ============================================================
-//  BLOCKY SHOOTER — server.js
-//  Same structure as the Island Reels server, adapted to the
-//  shooter game. Serves index.html + accounts + scores.
-//  Run: node server.js  →  http://localhost:3000
+//  BLOCKY SHOOTER — server.js (Upstash Redis)
+//  Accounts survive redeploys.
 // ============================================================
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Redis } = require('@upstash/redis');
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
 const CLIENT_DIR = __dirname;
 const ADMIN_NAME = process.env.ADMIN_USER || 'Just_12yrs_old';
 
-// ---------- persistence ----------
-let DB = { users: {}, sessions: {} };
-let savePending = null;
-
-function loadDB() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      DB = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      DB.users = DB.users || {};
-      DB.sessions = DB.sessions || {};
-    }
-  } catch (e) { console.error('load failed:', e.message); }
-}
-
-function saveDB() {
-  clearTimeout(savePending);
-  savePending = setTimeout(saveDBNow, 300);
-}
-
-function saveDBNow() {
-  clearTimeout(savePending);
-  try {
-    const tmp = DATA_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(DB));
-    fs.renameSync(tmp, DATA_FILE);
-  } catch (e) { console.error('save failed:', e.message); }
-}
+const redis = Redis.fromEnv();
 
 // ---------- auth ----------
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
-
 function makeUser(username, password) {
   const salt = crypto.randomBytes(16).toString('hex');
   return {
-    username,
-    salt,
+    username: username,
+    salt: salt,
     hash: hashPassword(password, salt),
     createdAt: Date.now(),
     lastSeen: Date.now(),
-    lastSave: null,
-    // ---- shooter stats ----
+    lastSave: '',
     highScore: 0,
     totalKills: 0,
     gamesPlayed: 0,
-    // -------------------------
     rank: 'Recruit',
-    isBanned: false,
-    isAdmin: username === ADMIN_NAME,
+    isBanned: 'false',
+    isAdmin: username === ADMIN_NAME ? 'true' : 'false',
   };
 }
-
 function publicUser(u) {
   return {
     username: u.username,
-    highScore: u.highScore || 0,
-    totalKills: u.totalKills || 0,
-    gamesPlayed: u.gamesPlayed || 0,
+    highScore: Number(u.highScore) || 0,
+    totalKills: Number(u.totalKills) || 0,
+    gamesPlayed: Number(u.gamesPlayed) || 0,
     rank: u.rank || 'Recruit',
-    last_save: u.lastSave,
-    isAdmin: !!u.isAdmin,
+    last_save: u.lastSave ? Number(u.lastSave) : null,
+    isAdmin: u.isAdmin === 'true' || u.isAdmin === true,
   };
 }
 
-function authUser(req) {
+// ---------- redis data access ----------
+async function getUser(username) {
+  if (!username) return null;
+  const data = await redis.hgetall('user:' + username);
+  if (!data || Object.keys(data).length === 0) return null;
+  return data;
+}
+async function saveUser(user) {
+  await redis.hset('user:' + user.username, user);
+}
+async function authUser(req) {
   const h = req.headers.authorization || '';
   const token = h.startsWith('Bearer ') ? h.slice(7) : null;
   if (!token) return null;
-  const username = DB.sessions[token];
+  const username = await redis.get('session:' + token);
   if (!username) return null;
-  const user = DB.users[username];
-  if (!user || user.isBanned) return null;
-  user.lastSeen = Date.now();
+  const user = await getUser(username);
+  if (!user) return null;
+  if (user.isBanned === 'true' || user.isBanned === true) return null;
+  await redis.expire('session:' + token, 60 * 60 * 24 * 7);
   return user;
 }
 
@@ -105,7 +85,6 @@ function sendJSON(res, code, obj) {
   });
   res.end(body);
 }
-
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -126,103 +105,113 @@ function readBody(req) {
 // ---------- routes ----------
 const routes = {
 
-  'GET /api/health': (req, res) => {
-    sendJSON(res, 200, { ok: true, users: Object.keys(DB.users).length });
+  'GET /api/health': async (req, res) => {
+    try {
+      await redis.ping();
+      sendJSON(res, 200, { ok: true, redis: 'connected' });
+    } catch (e) {
+      sendJSON(res, 500, { ok: false, error: String(e) });
+    }
   },
 
   'POST /api/register': async (req, res) => {
-    const { username, password } = await readBody(req);
+    const body = await readBody(req);
+    const username = body.username;
+    const password = body.password;
     if (!username || !password) return sendJSON(res, 400, { success: false, error: 'Missing fields' });
-    if (username.length < 3 || username.length > 20) return sendJSON(res, 400, { success: false, error: 'Username must be 3-20 characters' });
+    if (username.length < 3 || username.length > 20) return sendJSON(res, 400, { success: false, error: 'Username 3-20 chars' });
     if (!/^[A-Za-z0-9_]+$/.test(username)) return sendJSON(res, 400, { success: false, error: 'Letters, numbers, underscores only' });
-    if (password.length < 4) return sendJSON(res, 400, { success: false, error: 'Password must be at least 4 characters' });
-    if (DB.users[username]) return sendJSON(res, 409, { success: false, error: 'Username already taken' });
+    if (password.length < 4) return sendJSON(res, 400, { success: false, error: 'Password min 4 chars' });
+
+    const existing = await getUser(username);
+    if (existing) return sendJSON(res, 409, { success: false, error: 'Username taken' });
 
     const user = makeUser(username, password);
-    DB.users[username] = user;
+    await saveUser(user);
     const token = crypto.randomBytes(32).toString('hex');
-    DB.sessions[token] = username;
-    saveDB();
-    sendJSON(res, 200, { success: true, token, user: publicUser(user) });
+    await redis.set('session:' + token, username, { ex: 60 * 60 * 24 * 7 });
+    sendJSON(res, 200, { success: true, token: token, user: publicUser(user) });
   },
 
   'POST /api/login': async (req, res) => {
-    const { username, password } = await readBody(req);
-    const user = DB.users[username];
+    const body = await readBody(req);
+    const username = body.username;
+    const password = body.password;
+    const user = await getUser(username);
     if (!user) return sendJSON(res, 401, { success: false, error: 'User not found' });
-    if (user.isBanned) return sendJSON(res, 403, { success: false, error: 'This account is banned' });
+    if (user.isBanned === 'true') return sendJSON(res, 403, { success: false, error: 'Banned' });
 
     const attempt = hashPassword(password || '', user.salt);
     const stored = user.hash;
-    if (attempt.length !== stored.length ||
+    if (!stored || attempt.length !== stored.length ||
         !crypto.timingSafeEqual(Buffer.from(attempt, 'hex'), Buffer.from(stored, 'hex'))) {
-      return sendJSON(res, 401, { success: false, error: 'Incorrect password' });
+      return sendJSON(res, 401, { success: false, error: 'Wrong password' });
     }
 
     const token = crypto.randomBytes(32).toString('hex');
-    DB.sessions[token] = username;
-    user.lastSeen = Date.now();
-    saveDB();
-    sendJSON(res, 200, { success: true, token, user: publicUser(user) });
+    await redis.set('session:' + token, username, { ex: 60 * 60 * 24 * 7 });
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+    sendJSON(res, 200, { success: true, token: token, user: publicUser(user) });
   },
 
   'POST /api/logout': async (req, res) => {
     const h = req.headers.authorization || '';
     const token = h.startsWith('Bearer ') ? h.slice(7) : null;
-    if (token && DB.sessions[token]) {
-      delete DB.sessions[token];
-      saveDB();
-    }
+    if (token) await redis.del('session:' + token);
     sendJSON(res, 200, { success: true });
   },
 
-  'GET /api/load': (req, res) => {
-    const user = authUser(req);
-    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+  'GET /api/load': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
     sendJSON(res, 200, { success: true, user: publicUser(user) });
   },
 
   'POST /api/score': async (req, res) => {
-    const user = authUser(req);
-    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
 
     const body = await readBody(req);
-
-    // sanity limits — stops obvious devtools tampering
     if (typeof body.score !== 'number' || !isFinite(body.score) || body.score < 0 || body.score > 1e9) {
       return sendJSON(res, 400, { success: false, error: 'Invalid score' });
     }
 
-    user.gamesPlayed = (user.gamesPlayed || 0) + 1;
-    user.totalKills = (user.totalKills || 0) + (typeof body.kills === 'number' ? Math.max(0, Math.floor(body.kills)) : 0);
-    if (body.score > (user.highScore || 0)) user.highScore = Math.floor(body.score);
-    user.lastSave = Date.now();
-    user.lastSeen = Date.now();
+    user.gamesPlayed = String((Number(user.gamesPlayed) || 0) + 1);
+    user.totalKills = String((Number(user.totalKills) || 0) + (typeof body.kills === 'number' ? Math.max(0, Math.floor(body.kills)) : 0));
+    const newHigh = Math.floor(body.score);
+    if (newHigh > (Number(user.highScore) || 0)) user.highScore = String(newHigh);
+    user.lastSave = String(Date.now());
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
 
-    saveDB();
     sendJSON(res, 200, {
       success: true,
-      highScore: user.highScore,
-      totalKills: user.totalKills,
-      gamesPlayed: user.gamesPlayed,
+      highScore: Number(user.highScore),
+      totalKills: Number(user.totalKills),
+      gamesPlayed: Number(user.gamesPlayed),
       message: 'Score saved!',
     });
   },
 
-  'GET /api/leaderboard': (req, res) => {
-    const board = Object.values(DB.users)
-      .map(u => ({
-        username: u.username,
-        highScore: u.highScore || 0,
-        totalKills: u.totalKills || 0,
-        gamesPlayed: u.gamesPlayed || 0,
-        rank: u.rank || 'Recruit',
-        is_admin: u.isAdmin ? 1 : 0,
-        last_save: u.lastSave,
-      }))
-      .sort((a, b) => b.highScore - a.highScore)
-      .slice(0, 100);
-    sendJSON(res, 200, { leaderboard: board });
+  'GET /api/leaderboard': async (req, res) => {
+    const keys = await redis.keys('user:*');
+    const users = [];
+    for (let i = 0; i < keys.length; i++) {
+      const data = await redis.hgetall(keys[i]);
+      if (!data || !data.username) continue;
+      users.push({
+        username: data.username,
+        highScore: Number(data.highScore) || 0,
+        totalKills: Number(data.totalKills) || 0,
+        gamesPlayed: Number(data.gamesPlayed) || 0,
+        rank: data.rank || 'Recruit',
+        is_admin: (data.isAdmin === 'true' || data.isAdmin === true) ? 1 : 0,
+        last_save: data.lastSave ? Number(data.lastSave) : null,
+      });
+    }
+    users.sort(function(a, b) { return b.highScore - a.highScore; });
+    sendJSON(res, 200, { leaderboard: users.slice(0, 100) });
   },
 
 };
@@ -243,15 +232,10 @@ function serveStatic(req, res, pathname) {
   let rel = pathname === '/' ? '/index.html' : pathname;
   rel = path.normalize(rel).replace(/^[/\\]+/, '');
   if (rel.startsWith('..')) { res.writeHead(403); return res.end('Forbidden'); }
-
   const filePath = path.join(CLIENT_DIR, rel);
   if (!filePath.startsWith(CLIENT_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
-
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      return res.end('Not found');
-    }
+  fs.readFile(filePath, function(err, data) {
+    if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
     const ext = path.extname(filePath).toLowerCase();
     res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
     res.end(data);
@@ -260,8 +244,8 @@ function serveStatic(req, res, pathname) {
 
 // ---------- server ----------
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const key = `${req.method} ${url.pathname}`;
+  const url = new URL(req.url, 'http://' + (req.headers.host || 'localhost'));
+  const key = req.method + ' ' + url.pathname;
 
   if (routes[key]) {
     try {
@@ -281,44 +265,29 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ---------- boot ----------
-loadDB();
-
-if (!DB.users[ADMIN_NAME]) {
-  const pw = crypto.randomBytes(9).toString('base64url');
-  DB.users[ADMIN_NAME] = makeUser(ADMIN_NAME, pw);
-  DB.users[ADMIN_NAME].highScore = 999999;
-  DB.users[ADMIN_NAME].isAdmin = true;
-  saveDBNow();
-  console.log('');
-  console.log('='.repeat(56));
-  console.log('  ADMIN ACCOUNT CREATED');
-  console.log('  username: ' + ADMIN_NAME);
-  console.log('  password: ' + pw);
-  console.log('  (save this — it will NOT be shown again)');
-  console.log('='.repeat(56));
-  console.log('');
-}
-
-// clean up stale sessions (7 days inactive)
-setInterval(() => {
-  const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 7;
-  for (const [token, username] of Object.entries(DB.sessions)) {
-    const u = DB.users[username];
-    if (!u || (u.lastSeen || 0) < cutoff) delete DB.sessions[token];
-  }
-  saveDB();
-}, 1000 * 60 * 30);
-
-process.on('SIGINT', () => {
-  console.log('\nShutting down — saving...');
-  saveDBNow();
-  process.exit(0);
-});
-
-server.listen(PORT, () => {
+server.listen(PORT, async function() {
   console.log('');
   console.log('🔫 Blocky Shooter server running');
   console.log('   → http://localhost:' + PORT);
-  console.log('   users loaded: ' + Object.keys(DB.users).length);
-  console.log('');
+
+  try {
+    const admin = await getUser(ADMIN_NAME);
+    if (!admin) {
+      const pw = crypto.randomBytes(9).toString('base64url');
+      const user = makeUser(ADMIN_NAME, pw);
+      user.highScore = '999999';
+      user.isAdmin = 'true';
+      await saveUser(user);
+      console.log('');
+      console.log('='.repeat(56));
+      console.log('  ADMIN ACCOUNT CREATED');
+      console.log('  username: ' + ADMIN_NAME);
+      console.log('  password: ' + pw);
+      console.log('  (save this — it will NOT be shown again)');
+      console.log('='.repeat(56));
+      console.log('');
+    }
+  } catch (e) {
+    console.error('Admin setup failed:', e.message);
+  }
 });
