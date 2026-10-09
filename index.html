@@ -38,7 +38,8 @@
           box-shadow: 0 4px 12px rgba(0,0,0,0.5); transition: all 0.12s; }
   .slot .num { position: absolute; top: 4px; left: 8px; font-size: 12px; color: #8ab; }
   .slot .icon { font-size: 34px; line-height: 1; margin-bottom: 4px; }
-  .slot .name { font-size: 11px; color: #ccc; letter-spacing: 1px; }
+  .slot .name { font-size: 10px; color: #ccc; letter-spacing: 1px; }
+  .slot .ammo { position: absolute; bottom: 4px; right: 6px; font-size: 11px; color: #ffd; }
   .slot.active { border-color: #4a9eff; background: rgba(40,80,140,0.85);
                  transform: translateY(-8px) scale(1.06);
                  box-shadow: 0 0 22px rgba(74,158,255,0.8); }
@@ -54,6 +55,9 @@
                    border-radius: 2px; overflow: hidden; }
   #allies .hpfill { height: 100%; background: #4a9eff; }
   #allies .status { margin-left: 8px; color: #6af; font-size: 10px; }
+  #coinHud { position: fixed; top: calc(100px + env(safe-area-inset-top)); left: 18px;
+             font: bold 14px monospace; color: #ffd94a; text-shadow: 1px 1px 2px #000;
+             pointer-events: none; }
 
   #home {
     position: fixed; inset: 0; z-index: 100;
@@ -102,45 +106,14 @@
   #playBtn:active { transform: translateY(-2px); }
   #playBtn:disabled { background: #333; border-color: #555; color: #888; box-shadow: none; }
 
-  #leaderboardBtn {
-    margin-top: 12px; padding: 12px 40px; font-size: 16px; font-weight: bold;
+  #shopBtn, #loadoutBtn, #leaderboardBtn {
+    margin-top: 12px; padding: 12px 32px; font-size: 15px; font-weight: bold;
     letter-spacing: 2px; background: rgba(30,60,110,0.85);
     border: 3px solid #8af; border-radius: 10px; color: #fff; cursor: pointer;
     font-family: monospace; box-shadow: 0 4px 18px rgba(74,158,255,0.4);
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: transparent; margin-left: 6px; margin-right: 6px;
   }
-  #leaderboardBtn:active { transform: translateY(-2px); }
-
-  #leaderboardModal {
-    position: fixed; inset: 0; z-index: 200; display: none;
-    flex-direction: column; align-items: center; justify-content: center;
-    background: rgba(5,10,20,0.95); color: #fff;
-    padding: 20px; text-align: center;
-  }
-  #leaderboardModal h2 { color: #4a9eff; margin: 0 0 20px;
-    text-shadow: 0 0 20px #4a9eff; letter-spacing: 3px; font-size: 28px; }
-  #leaderboardList {
-    width: 100%; max-width: 500px; max-height: 60vh; overflow-y: auto;
-    background: rgba(20,30,50,0.8); border: 2px solid rgba(90,150,220,0.4);
-    border-radius: 12px; padding: 10px; font-family: monospace; font-size: 14px;
-  }
-  .lb-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 14px; margin: 4px 0; background: rgba(0,0,0,0.3);
-    border-radius: 8px; border-left: 4px solid transparent;
-  }
-  .lb-row.top1 { border-left-color: #ffd700; background: rgba(255,215,0,0.12); }
-  .lb-row.top2 { border-left-color: #c0c0c0; background: rgba(192,192,192,0.1); }
-  .lb-row.top3 { border-left-color: #cd7f32; background: rgba(205,127,50,0.1); }
-  .lb-row.me { border-left-color: #4bea8b; background: rgba(75,234,139,0.15); }
-  .lb-rank { color: #8af; width: 40px; text-align: left; font-weight: bold; }
-  .lb-name { flex: 1; text-align: left; color: #fff; }
-  .lb-score { color: #4bea8b; font-weight: bold; }
-  #leaderboardClose {
-    margin-top: 20px; padding: 12px 40px; font: bold 16px monospace; letter-spacing: 2px;
-    background: #4a9eff; border: 2px solid #8cf; border-radius: 8px; color: #fff;
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
+  #shopBtn:active, #loadoutBtn:active, #leaderboardBtn:active { transform: translateY(-2px); }
 
   /* ============ ACCOUNT PANEL ============ */
   #accountPanel {
@@ -169,16 +142,112 @@
   #accountMsg.error { color: #ff6b6b; }
   #accountMsg.ok { color: #4bea8b; }
   #loggedInBox {
-    display: none; width: 320px; max-width: 90vw; margin: 0 auto 20px;
+    display: none; width: 340px; max-width: 90vw; margin: 0 auto 20px;
     padding: 12px; background: rgba(30,80,50,0.35);
     border: 2px solid rgba(75,234,139,0.5); border-radius: 12px;
     color: #fff; font: 13px monospace;
   }
   #loggedInBox .userRow { display: flex; justify-content: space-between; margin: 4px 0; }
   #loggedInBox .uname { color: #4bea8b; font-weight: bold; }
+  #loggedInBox .coins { color: #ffd94a; }
   #logoutBtn { margin-top: 8px; padding: 6px 16px; background: transparent;
                border: 2px solid #666; color: #ccc; border-radius: 6px;
                font: 11px monospace; cursor: pointer; }
+
+  /* ============ MODALS (shop / loadout / leaderboard) ============ */
+  .modal {
+    position: fixed; inset: 0; z-index: 200; display: none;
+    flex-direction: column; align-items: center; justify-content: flex-start;
+    background: rgba(5,10,20,0.96); color: #fff;
+    padding: 20px; text-align: center; overflow-y: auto;
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  .modal h2 { color: #4a9eff; margin: 0 0 20px;
+    text-shadow: 0 0 20px #4a9eff; letter-spacing: 3px; font-size: 26px; }
+  .modal .closeBtn {
+    margin-top: 20px; padding: 12px 40px; font: bold 16px monospace; letter-spacing: 2px;
+    background: #4a9eff; border: 2px solid #8cf; border-radius: 8px; color: #fff;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* shop grid */
+  #shopGrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px; max-width: 720px; width: 100%;
+  }
+  .shopCard {
+    background: rgba(20,30,50,0.85); border: 3px solid rgba(90,150,220,0.4);
+    border-radius: 12px; padding: 12px; text-align: center; color: #fff;
+    font-family: monospace; position: relative;
+  }
+  .shopCard.owned { border-color: #4bea8b; box-shadow: 0 0 16px rgba(75,234,139,0.35); }
+  .shopCard .wName { font-size: 18px; font-weight: bold; color: #fff; margin-bottom: 4px; }
+  .shopCard .wIcon { font-size: 40px; margin: 6px 0; }
+  .shopCard .wStats { font-size: 11px; color: #9ab; margin-bottom: 8px; line-height: 1.4; }
+  .shopCard .wPrice { font-size: 15px; color: #ffd94a; font-weight: bold; margin-bottom: 8px; }
+  .shopCard button {
+    width: 100%; padding: 8px; border-radius: 6px; font: bold 13px monospace;
+    letter-spacing: 1px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .shopCard .buyBtn { background: #4a9eff; border: 2px solid #8cf; color: #fff; }
+  .shopCard .buyBtn:disabled { background: #444; border-color: #666; color: #999; cursor: default; }
+  .shopCard .ownedTag { color: #4bea8b; font-weight: bold; padding: 8px; }
+
+  /* loadout */
+  #loadoutSlots {
+    display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .loadSlot {
+    width: 140px; height: 140px; background: rgba(20,30,50,0.85);
+    border: 3px dashed rgba(90,150,220,0.5); border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: monospace; color: #fff; position: relative;
+  }
+  .loadSlot.filled { border-style: solid; border-color: #4a9eff; }
+  .loadSlot .icon { font-size: 40px; }
+  .loadSlot .slotLabel { font-size: 10px; color: #8ab; position: absolute; top: 4px; left: 6px; }
+  .loadSlot .wName { font-size: 12px; color: #fff; margin-top: 4px; }
+  .loadSlot .removeBtn { position: absolute; top: 4px; right: 4px; background: rgba(200,40,40,0.8);
+                         border: none; color: #fff; font-size: 14px; width: 22px; height: 22px;
+                         border-radius: 50%; cursor: pointer; }
+
+  #loadoutOwned {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px; max-width: 720px; width: 100%; margin-top: 10px;
+  }
+  .ownedCard {
+    background: rgba(20,30,50,0.85); border: 3px solid rgba(90,150,220,0.3);
+    border-radius: 10px; padding: 8px; cursor: pointer; font-family: monospace;
+    color: #fff; text-align: center; transition: all 0.1s;
+  }
+  .ownedCard:active { transform: scale(0.96); }
+  .ownedCard.disabled { opacity: 0.4; cursor: default; }
+  .ownedCard .icon { font-size: 28px; }
+  .ownedCard .wName { font-size: 11px; margin-top: 4px; }
+
+  #loadoutMsg { min-height: 20px; font-size: 13px; margin-top: 12px; }
+  #loadoutMsg.error { color: #ff6b6b; }
+  #loadoutMsg.ok { color: #4bea8b; }
+
+  /* leaderboard */
+  #leaderboardList {
+    width: 100%; max-width: 500px; max-height: 60vh; overflow-y: auto;
+    background: rgba(20,30,50,0.8); border: 2px solid rgba(90,150,220,0.4);
+    border-radius: 12px; padding: 10px; font-family: monospace; font-size: 14px;
+  }
+  .lb-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; margin: 4px 0; background: rgba(0,0,0,0.3);
+    border-radius: 8px; border-left: 4px solid transparent;
+  }
+  .lb-row.top1 { border-left-color: #ffd700; background: rgba(255,215,0,0.12); }
+  .lb-row.top2 { border-left-color: #c0c0c0; background: rgba(192,192,192,0.1); }
+  .lb-row.top3 { border-left-color: #cd7f32; background: rgba(205,127,50,0.1); }
+  .lb-row.me { border-left-color: #4bea8b; background: rgba(75,234,139,0.15); }
+  .lb-rank { color: #8af; width: 40px; text-align: left; font-weight: bold; }
+  .lb-name { flex: 1; text-align: left; color: #fff; }
+  .lb-score { color: #4bea8b; font-weight: bold; }
 
   #mobileControls { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 50; }
   #mobileControls.active { display: block; }
@@ -243,7 +312,6 @@
   <h1>BLOCKY SHOOTER</h1>
   <div class="subtitle">SELECT PLATFORM & MAP</div>
 
-  <!-- ======== ACCOUNT PANEL ======== -->
   <div id="accountPanel">
     <h3>ACCOUNT</h3>
     <input id="usernameInput" type="text" placeholder="username" autocomplete="username" maxlength="20">
@@ -256,14 +324,13 @@
     <div id="accountMsg"></div>
   </div>
 
-  <!-- shown after login -->
   <div id="loggedInBox">
     <div class="userRow"><span>PLAYER</span><span class="uname" id="loggedInName">—</span></div>
     <div class="userRow"><span>HIGH SCORE</span><span id="loggedInHigh">0</span></div>
+    <div class="userRow"><span>COINS</span><span class="coins" id="loggedInCoins">0</span></div>
     <div class="userRow"><span>GAMES</span><span id="loggedInGames">0</span></div>
     <button id="logoutBtn">LOGOUT</button>
   </div>
-  <!-- ================================= -->
 
   <h2>PLATFORM</h2>
   <div class="row" id="platformRow">
@@ -299,13 +366,41 @@
   </div>
 
   <button id="playBtn" disabled>▶ PLAY</button>
-  <button id="leaderboardBtn">🏆 LEADERBOARD</button>
+  <div style="margin-top:12px">
+    <button id="shopBtn">🛒 SHOP</button>
+    <button id="loadoutBtn">🎒 LOADOUT</button>
+    <button id="leaderboardBtn">🏆 LEADERBOARD</button>
+  </div>
 </div>
 
-<div id="leaderboardModal">
+<!-- SHOP -->
+<div id="shopModal" class="modal">
+  <h2>🛒 WEAPON SHOP</h2>
+  <div style="color:#ffd94a;font-size:16px;margin-bottom:16px">YOUR COINS: <span id="shopCoins">0</span></div>
+  <div id="shopGrid"></div>
+  <button class="closeBtn" id="shopClose">CLOSE</button>
+</div>
+
+<!-- LOADOUT -->
+<div id="loadoutModal" class="modal">
+  <h2>🎒 LOADOUT</h2>
+  <div style="color:#9ab;font-size:13px;margin-bottom:14px">Choose 1 to 3 weapons. Click owned weapons below.</div>
+  <div id="loadoutSlots">
+    <div class="loadSlot" data-slot="0"><span class="slotLabel">SLOT 1</span></div>
+    <div class="loadSlot" data-slot="1"><span class="slotLabel">SLOT 2</span></div>
+    <div class="loadSlot" data-slot="2"><span class="slotLabel">SLOT 3</span></div>
+  </div>
+  <div style="color:#8af;font-size:13px;margin-bottom:6px">YOUR WEAPONS:</div>
+  <div id="loadoutOwned"></div>
+  <div id="loadoutMsg"></div>
+  <button class="closeBtn" id="loadoutClose">CLOSE</button>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="leaderboardModal" class="modal">
   <h2>🏆 GLOBAL LEADERBOARD</h2>
   <div id="leaderboardList">Loading...</div>
-  <button id="leaderboardClose">CLOSE</button>
+  <button class="closeBtn" id="leaderboardClose">CLOSE</button>
 </div>
 
 <div id="hud">
@@ -319,14 +414,15 @@
     <span class="status" id="allyStatus-0">ROAMING</span>
   </div>
 </div>
+<div id="coinHud">🪙 <span id="coinCount">0</span></div>
 <div id="crosshair"></div>
 <canvas id="minimap" width="200" height="200"></canvas>
 <div id="zoomVignette"></div>
 
 <div id="hotbar">
-  <div class="slot" id="slot-0"><span class="num">1</span><div class="icon">🔫</div><div class="name">RIFLE</div></div>
-  <div class="slot" id="slot-1"><span class="num">2</span><div class="icon">🎯</div><div class="name">SNIPER</div></div>
-  <div class="slot" id="slot-2"><span class="num">3</span><div class="icon">💣</div><div class="name">GRENADE</div></div>
+  <div class="slot" id="slot-0"><span class="num">1</span><div class="icon">—</div><div class="name">—</div><span class="ammo"></span></div>
+  <div class="slot" id="slot-1"><span class="num">2</span><div class="icon">—</div><div class="name">—</div><span class="ammo"></span></div>
+  <div class="slot" id="slot-2"><span class="num">3</span><div class="icon">—</div><div class="name">—</div><span class="ammo"></span></div>
 </div>
 
 <div id="mobileControls">
@@ -345,6 +441,7 @@
 <div id="dead">
   <h1>YOU DIED</h1>
   <p id="deadScore">Score: 0</p>
+  <p id="deadCoins" style="font-size:16px; color:#ffd94a"></p>
   <p id="deadSave" style="font-size:14px; color:#8ab;"></p>
   <button onclick="location.reload()">BACK TO MENU</button>
 </div>
@@ -357,16 +454,51 @@
 // ================= GAME CONFIG =================
 const CONFIG = { platform: 'pc', mapKey: 'bomb' };
 
+// ================= WEAPON CATALOG (client-side, matches server) =================
+const WEAPON_INFO = {
+  m16:     { name: 'M16',     price: 0,    icon: '🔫' },
+  ak47:    { name: 'AK47',    price: 800,  icon: '🔫' },
+  m1916:   { name: 'M1916',   price: 1200, icon: '🔫' },
+  mp5:     { name: 'MP5',     price: 1500, icon: '🔫' },
+  scar:    { name: 'SCAR-H',  price: 2000, icon: '🔫' },
+  minigun: { name: 'Minigun', price: 3000, icon: '🌀' },
+  awp:     { name: 'AWP',     price: 3500, icon: '🎯' },
+  grenade: { name: 'Grenade', price: 0,    icon: '💣' },
+};
+
+// ================= WEAPON STATS =================
+// Each weapon: fireRate, auto, damage, spread, bulletSpeed, moveSpeedMul, zoom
+const WEAPON_STATS = {
+  m16:     { fireRate: 0.10, auto: true,  damage: 12, spread: 0.012, bulletSpeed: 45,  moveSpeedMul: 1.0,  isGrenade: false, ammo: '∞' },
+  ak47:    { fireRate: 0.13, auto: true,  damage: 20, spread: 0.020, bulletSpeed: 44,  moveSpeedMul: 0.95, isGrenade: false, ammo: '∞' },
+  m1916:   { fireRate: 0.55, auto: false, damage: 55, spread: 0.010, bulletSpeed: 60,  moveSpeedMul: 0.9,  isGrenade: false, ammo: '∞' },
+  mp5:     { fireRate: 0.06, auto: true,  damage: 8,  spread: 0.030, bulletSpeed: 40,  moveSpeedMul: 1.05, isGrenade: false, ammo: '∞' },
+  scar:    { fireRate: 0.14, auto: true,  damage: 26, spread: 0.018, bulletSpeed: 50,  moveSpeedMul: 0.9,  isGrenade: false, ammo: '∞' },
+  minigun: { fireRate: 0.035, auto: true, damage: 10, spread: 0.055, bulletSpeed: 42,  moveSpeedMul: 0.65, isGrenade: false, ammo: '∞', spinup: true },
+  awp:     { fireRate: 1.3,  auto: false, damage: 150, spread: 0.0,  bulletSpeed: 120, moveSpeedMul: 0.85, isGrenade: false, ammo: '∞', zoom: true },
+  grenade: { fireRate: 0.8,  auto: false, damage: 0,   spread: 0,    bulletSpeed: 0,   moveSpeedMul: 1.0,  isGrenade: true, ammo: '∞', maxGrenades: 3, refillTime: 12 },
+};
+
 // ================= ACCOUNT STATE =================
 const Account = {
   token: localStorage.getItem('bs_token') || null,
   user: null,
+  // Loadout for the current match (up to 3 weapon ids)
+  currentLoadout: (function() {
+    try {
+      const saved = localStorage.getItem('bs_loadout');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return ['m16', 'grenade'];
+  })(),
 };
+if (!Account.currentLoadout || Account.currentLoadout.length === 0) {
+  Account.currentLoadout = ['m16', 'grenade'];
+}
 
 function authHeaders() {
   return Account.token ? { 'Authorization': 'Bearer ' + Account.token } : {};
 }
-
 async function apiCall(path, body) {
   const opts = { method: body ? 'POST' : 'GET', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) };
   if (body) opts.body = JSON.stringify(body);
@@ -375,26 +507,24 @@ async function apiCall(path, body) {
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
-
 function setAccountMsg(text, isError) {
   const el = document.getElementById('accountMsg');
   el.textContent = text;
   el.className = isError ? 'error' : 'ok';
 }
-
 function showLoggedIn() {
   document.getElementById('accountPanel').style.display = 'none';
   const box = document.getElementById('loggedInBox');
   box.style.display = 'block';
   document.getElementById('loggedInName').textContent = Account.user.username;
   document.getElementById('loggedInHigh').textContent = Account.user.highScore || 0;
+  document.getElementById('loggedInCoins').textContent = Account.user.coins || 0;
   document.getElementById('loggedInGames').textContent = Account.user.gamesPlayed || 0;
 }
 function showLoggedOut() {
   document.getElementById('accountPanel').style.display = 'block';
   document.getElementById('loggedInBox').style.display = 'none';
 }
-
 async function doLogin() {
   const u = document.getElementById('usernameInput').value.trim();
   const p = document.getElementById('passwordInput').value;
@@ -405,13 +535,17 @@ async function doLogin() {
     Account.token = data.token;
     Account.user = data.user;
     localStorage.setItem('bs_token', data.token);
+    // sync loadout from server
+    if (data.user.loadout && data.user.loadout.length > 0) {
+      Account.currentLoadout = data.user.loadout.slice();
+      localStorage.setItem('bs_loadout', JSON.stringify(Account.currentLoadout));
+    }
     setAccountMsg('Welcome back, ' + data.user.username, false);
     showLoggedIn();
   } catch (e) {
     setAccountMsg(e.message, true);
   }
 }
-
 async function doRegister() {
   const u = document.getElementById('usernameInput').value.trim();
   const p = document.getElementById('passwordInput').value;
@@ -429,7 +563,6 @@ async function doRegister() {
     setAccountMsg(e.message, true);
   }
 }
-
 async function doLogout() {
   try { await apiCall('/api/logout', {}); } catch (e) {}
   Account.token = null;
@@ -438,23 +571,15 @@ async function doLogout() {
   showLoggedOut();
   setAccountMsg('Logged out', false);
 }
-
-async function submitScore(finalScore, kills) {
-  if (!Account.token) return;
-  try {
-    const data = await apiCall('/api/score', { score: finalScore, kills: kills });
-    if (Account.user) Account.user.highScore = data.highScore;
-    document.getElementById('deadSave').textContent = '✓ Score saved — high score: ' + data.highScore;
-  } catch (e) {
-    document.getElementById('deadSave').textContent = 'Could not save score: ' + e.message;
-  }
-}
-
 async function tryAutoLogin() {
   if (!Account.token) return showLoggedOut();
   try {
     const data = await apiCall('/api/load');
     Account.user = data.user;
+    if (data.user.loadout && data.user.loadout.length > 0) {
+      Account.currentLoadout = data.user.loadout.slice();
+      localStorage.setItem('bs_loadout', JSON.stringify(Account.currentLoadout));
+    }
     showLoggedIn();
   } catch (e) {
     Account.token = null;
@@ -463,6 +588,158 @@ async function tryAutoLogin() {
   }
 }
 
+// ================= SHOP =================
+function openShop() {
+  if (!Account.user) {
+    alert('You must log in to use the shop.');
+    return;
+  }
+  const modal = document.getElementById('shopModal');
+  modal.style.display = 'flex';
+  document.getElementById('shopCoins').textContent = Account.user.coins || 0;
+  renderShop();
+}
+function renderShop() {
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  const owned = Account.user.ownedWeapons || [];
+  const isAdmin = Account.user.isAdmin;
+  const coins = Account.user.coins || 0;
+
+  const order = ['m16', 'ak47', 'm1916', 'mp5', 'scar', 'minigun', 'awp', 'grenade'];
+  order.forEach(function(id) {
+    const info = WEAPON_INFO[id];
+    const stats = WEAPON_STATS[id];
+    if (!info || !stats) return;
+    const card = document.createElement('div');
+    card.className = 'shopCard';
+    const alreadyOwned = owned.includes(id);
+
+    let statLine = '';
+    if (stats.isGrenade) {
+      statLine = 'Max ' + (stats.maxGrenades || 3) + ' • Refill ' + (stats.refillTime || 12) + 's';
+    } else {
+      statLine = 'DMG ' + stats.damage + ' • Rate ' + (1/stats.fireRate).toFixed(1) + '/s';
+    }
+
+    card.innerHTML =
+      '<div class="wName">' + info.name + '</div>' +
+      '<div class="wIcon">' + info.icon + '</div>' +
+      '<div class="wStats">' + statLine + '</div>';
+
+    if (alreadyOwned) {
+      card.classList.add('owned');
+      const tag = document.createElement('div');
+      tag.className = 'ownedTag';
+      tag.textContent = '✓ OWNED';
+      card.appendChild(tag);
+    } else {
+      const priceEl = document.createElement('div');
+      priceEl.className = 'wPrice';
+      priceEl.textContent = '🪙 ' + info.price;
+      card.appendChild(priceEl);
+      const btn = document.createElement('button');
+      btn.className = 'buyBtn';
+      btn.textContent = 'BUY';
+      if (!isAdmin && coins < info.price) btn.disabled = true;
+      btn.addEventListener('click', function() { buyWeapon(id); });
+      card.appendChild(btn);
+    }
+    grid.appendChild(card);
+  });
+}
+async function buyWeapon(id) {
+  try {
+    const data = await apiCall('/api/buy-weapon', { weaponId: id });
+    Account.user = data.user;
+    document.getElementById('shopCoins').textContent = Account.user.coins;
+    document.getElementById('loggedInCoins').textContent = Account.user.coins;
+    renderShop();
+    alert(data.message || 'Purchased!');
+  } catch (e) {
+    alert('Purchase failed: ' + e.message);
+  }
+}
+
+// ================= LOADOUT =================
+function openLoadout() {
+  if (!Account.user) {
+    alert('You must log in to manage your loadout.');
+    return;
+  }
+  document.getElementById('loadoutModal').style.display = 'flex';
+  document.getElementById('loadoutMsg').textContent = '';
+  renderLoadout();
+}
+function renderLoadout() {
+  const owned = Account.user.ownedWeapons || ['m16'];
+  const loadout = Account.currentLoadout || [];
+
+  // slots
+  const slotEls = document.querySelectorAll('.loadSlot');
+  slotEls.forEach(function(el, i) {
+    const id = loadout[i];
+    el.className = 'loadSlot';
+    if (id && WEAPON_INFO[id]) {
+      el.classList.add('filled');
+      el.innerHTML = '<span class="slotLabel">SLOT ' + (i+1) + '</span>' +
+                     '<button class="removeBtn" data-remove="' + i + '">×</button>' +
+                     '<div class="icon">' + WEAPON_INFO[id].icon + '</div>' +
+                     '<div class="wName">' + WEAPON_INFO[id].name + '</div>';
+    } else {
+      el.innerHTML = '<span class="slotLabel">SLOT ' + (i+1) + '</span>';
+    }
+  });
+  // wire up remove buttons
+  document.querySelectorAll('.removeBtn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const idx = Number(btn.dataset.remove);
+      Account.currentLoadout.splice(idx, 1);
+      renderLoadout();
+    });
+  });
+
+  // owned weapons grid
+  const grid = document.getElementById('loadoutOwned');
+  grid.innerHTML = '';
+  owned.forEach(function(id) {
+    const info = WEAPON_INFO[id];
+    if (!info) return;
+    const card = document.createElement('div');
+    card.className = 'ownedCard';
+    card.innerHTML = '<div class="icon">' + info.icon + '</div><div class="wName">' + info.name + '</div>';
+    if (Account.currentLoadout.includes(id) || Account.currentLoadout.length >= 3) {
+      card.classList.add('disabled');
+    } else {
+      card.addEventListener('click', function() {
+        if (Account.currentLoadout.length >= 3) return;
+        Account.currentLoadout.push(id);
+        renderLoadout();
+      });
+    }
+    grid.appendChild(card);
+  });
+}
+async function saveLoadout() {
+  if (Account.currentLoadout.length < 1) {
+    document.getElementById('loadoutMsg').textContent = 'Pick at least 1 weapon';
+    document.getElementById('loadoutMsg').className = 'error';
+    return;
+  }
+  try {
+    await apiCall('/api/save-loadout', { loadout: Account.currentLoadout });
+    localStorage.setItem('bs_loadout', JSON.stringify(Account.currentLoadout));
+    document.getElementById('loadoutMsg').textContent = '✓ Loadout saved!';
+    document.getElementById('loadoutMsg').className = 'ok';
+    if (Account.user) Account.user.loadout = Account.currentLoadout.slice();
+  } catch (e) {
+    document.getElementById('loadoutMsg').textContent = 'Save failed: ' + e.message;
+    document.getElementById('loadoutMsg').className = 'error';
+  }
+}
+
+// ================= LEADERBOARD =================
 async function showLeaderboard() {
   const modal = document.getElementById('leaderboardModal');
   const list = document.getElementById('leaderboardList');
@@ -491,10 +768,9 @@ async function showLeaderboard() {
       list.appendChild(div);
     });
   } catch (e) {
-    list.innerHTML = '<div style="padding:20px;color:#ff6b6b">Could not load leaderboard: ' + escapeHtml(e.message) + '</div>';
+    list.innerHTML = '<div style="padding:20px;color:#ff6b6b">Could not load: ' + escapeHtml(e.message) + '</div>';
   }
 }
-
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, function(c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -550,15 +826,24 @@ const Audio = (function() {
     src.connect(flt); flt.connect(gain); gain.connect(master);
     src.start(t0); src.stop(t0 + (o.attack || 0.001) + dec + 0.05);
   }
-  function rifleShot() {
-    noise({ dur: 0.08, vol: 0.5, filterFreq: 2600, filterType: 'bandpass', filterQ: 0.7, decay: 0.06 });
-    noise({ dur: 0.05, vol: 0.3, filterFreq: 900, filterType: 'lowpass', decay: 0.05 });
-    tone({ type: 'square', freq: 180, freqEnd: 60, dur: 0.06, vol: 0.22, distortion: 8 });
+  // Generic gunshot — pitches/filters scale with "power" (0..1) for weapon variety
+  function gunshot(power) {
+    power = Math.max(0, Math.min(1, power || 0.4));
+    const bright = 2600 - power * 800;
+    const boom = 500 + power * 400;
+    noise({ dur: 0.08, vol: 0.45 + power * 0.1, filterFreq: bright, filterType: 'bandpass', filterQ: 0.7, decay: 0.06 });
+    noise({ dur: 0.05, vol: 0.28, filterFreq: boom, filterType: 'lowpass', decay: 0.05 });
+    tone({ type: 'square', freq: 220 - power * 60, freqEnd: 60 - power * 20, dur: 0.06, vol: 0.22, distortion: 8 });
   }
   function sniperShot() {
     noise({ dur: 0.35, vol: 0.7, filterFreq: 500, filterType: 'lowpass', decay: 0.3 });
     noise({ dur: 0.1, vol: 0.45, filterFreq: 3000, filterType: 'highpass', decay: 0.06 });
     tone({ type: 'sine', freq: 120, freqEnd: 35, dur: 0.35, vol: 0.45, distortion: 12 });
+  }
+  function minigunShot() {
+    noise({ dur: 0.05, vol: 0.4, filterFreq: 3200, filterType: 'bandpass', filterQ: 0.8, decay: 0.035 });
+    noise({ dur: 0.04, vol: 0.25, filterFreq: 700, filterType: 'lowpass', decay: 0.03 });
+    tone({ type: 'square', freq: 180, freqEnd: 70, dur: 0.04, vol: 0.18, distortion: 10 });
   }
   function grenadeThrow() { noise({ dur: 0.25, vol: 0.22, filterFreq: 800, filterType: 'bandpass', filterQ: 3, decay: 0.22 }); }
   function explosion() {
@@ -608,6 +893,7 @@ const Audio = (function() {
     tone({ type: 'sawtooth', freq: 120, freqEnd: 40, dur: 0.14, vol: 0.22, distortion: 8 });
   }
   function grenadeBeep() { tone({ type: 'square', freq: 1400, dur: 0.03, vol: 0.12 }); }
+  function emptyClick() { tone({ type: 'square', freq: 700, freqEnd: 400, dur: 0.04, vol: 0.1 }); }
   function startAmbient() {
     if (!ctx || ambientStarted) return; ambientStarted = true;
     const bufferSize = 2 * ctx.sampleRate;
@@ -628,10 +914,11 @@ const Audio = (function() {
     resume: function() { if (ctx && ctx.state === 'suspended') ctx.resume(); },
     toggleMute: function() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.55; return muted; },
     startAmbient: startAmbient,
-    rifleShot: rifleShot, sniperShot: sniperShot, grenadeThrow: grenadeThrow, explosion: explosion,
-    enemyHit: enemyHit, wallHit: wallHit, enemyDeath: enemyDeath, playerHurt: playerHurt,
-    footstep: footstep, jump: jump, land: land, weaponSwitch: weaponSwitch,
-    enemyShot: enemyShot, heavyShot: heavyShot, shotgunShot: shotgunShot, grenadeBeep: grenadeBeep,
+    gunshot: gunshot, sniperShot: sniperShot, minigunShot: minigunShot,
+    grenadeThrow: grenadeThrow, explosion: explosion, enemyHit: enemyHit, wallHit: wallHit,
+    enemyDeath: enemyDeath, playerHurt: playerHurt, footstep: footstep, jump: jump, land: land,
+    weaponSwitch: weaponSwitch, enemyShot: enemyShot, heavyShot: heavyShot,
+    shotgunShot: shotgunShot, grenadeBeep: grenadeBeep, emptyClick: emptyClick,
   };
 })();
 
@@ -1023,34 +1310,101 @@ function redrawHealthBar(sprite, ratio) {
 }
 
 // ================= WEAPON MODELS =================
+// Each weapon has its own 3D model attached to the camera when equipped.
 const gunMats = {
-  dark: new THREE.MeshLambertMaterial({ color: 0x2a2f38 }),
-  metal: new THREE.MeshLambertMaterial({ color: 0x4a5260 }),
-  grip: new THREE.MeshLambertMaterial({ color: 0x1a1d22 }),
-  sniperGreen: new THREE.MeshLambertMaterial({ color: 0x2f3a22 }),
+  dark:      new THREE.MeshLambertMaterial({ color: 0x2a2f38 }),
+  metal:     new THREE.MeshLambertMaterial({ color: 0x4a5260 }),
+  grip:      new THREE.MeshLambertMaterial({ color: 0x1a1d22 }),
+  wood:      new THREE.MeshLambertMaterial({ color: 0x6a4a2a }),
+  greenGun:  new THREE.MeshLambertMaterial({ color: 0x2f3a22 }),
+  akWood:    new THREE.MeshLambertMaterial({ color: 0x8a5a2a }),
+  gold:      new THREE.MeshLambertMaterial({ color: 0xaa8844 }),
+  blackGun:  new THREE.MeshLambertMaterial({ color: 0x15181c }),
 };
-function buildRifle() {
+
+function makeBox(w,h,d,x,y,z,mat,parent) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); parent.add(m); return m;
+}
+
+function buildM16() {
   const g = new THREE.Group();
-  const add = function(w,h,d,x,y,z,mat) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-    m.position.set(x,y,z); g.add(m); return m;
-  };
-  add(0.16,0.16,0.75, 0.26,-0.24,-0.55, gunMats.dark);
-  add(0.08,0.08,0.35, 0.26,-0.22,-1.02, gunMats.metal);
-  add(0.12,0.28,0.12, 0.26,-0.42,-0.28, gunMats.grip);
+  makeBox(0.16,0.16,0.75, 0.26,-0.24,-0.55, gunMats.dark, g);
+  makeBox(0.08,0.08,0.35, 0.26,-0.22,-1.02, gunMats.metal, g);
+  makeBox(0.12,0.28,0.12, 0.26,-0.42,-0.28, gunMats.grip, g);
+  makeBox(0.10,0.22,0.14, 0.26,-0.42,-0.6, gunMats.metal, g);
+  makeBox(0.04,0.08,0.04, 0.26,-0.12,-0.55, gunMats.metal, g);
   return g;
 }
-function buildSniper() {
+function buildAK47() {
   const g = new THREE.Group();
-  const add = function(w,h,d,x,y,z,mat) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
-    m.position.set(x,y,z); g.add(m); return m;
-  };
-  add(0.14,0.14,1.3, 0.26,-0.22,-0.75, gunMats.sniperGreen);
-  add(0.07,0.07,0.8, 0.26,-0.2,-1.7, gunMats.metal);
-  add(0.12,0.12,0.18, 0.26,-0.2,-2.15, gunMats.dark);
-  add(0.1,0.1,0.5, 0.26,-0.02,-0.7, gunMats.dark);
-  add(0.12,0.3,0.12, 0.26,-0.45,-0.4, gunMats.grip);
+  makeBox(0.16,0.16,0.85, 0.26,-0.24,-0.6, gunMats.dark, g);
+  makeBox(0.10,0.10,0.4, 0.26,-0.22,-1.1, gunMats.metal, g);
+  makeBox(0.12,0.3,0.14, 0.26,-0.42,-0.3, gunMats.akWood, g);      // wood grip
+  makeBox(0.14,0.24,0.16, 0.26,-0.44,-0.65, gunMats.dark, g);       // big mag
+  makeBox(0.06,0.06,0.5, 0.26,-0.10,-0.4, gunMats.akWood, g);       // wood handguard
+  return g;
+}
+function buildM1916() {
+  const g = new THREE.Group();
+  makeBox(0.14,0.14,1.1, 0.26,-0.24,-0.7, gunMats.wood, g);         // long wood stock
+  makeBox(0.08,0.08,0.7, 0.26,-0.22,-1.45, gunMats.metal, g);       // long barrel
+  makeBox(0.10,0.30,0.12, 0.26,-0.42,-0.35, gunMats.dark, g);       // grip
+  makeBox(0.06,0.10,0.5, 0.26,-0.10,-0.9, gunMats.dark, g);         // scope rail
+  makeBox(0.10,0.10,0.28, 0.26,-0.02,-1.0, gunMats.metal, g);
+  return g;
+}
+function buildMP5() {
+  const g = new THREE.Group();
+  makeBox(0.14,0.14,0.55, 0.26,-0.24,-0.45, gunMats.dark, g);
+  makeBox(0.08,0.08,0.28, 0.26,-0.22,-0.82, gunMats.metal, g);
+  makeBox(0.11,0.24,0.11, 0.26,-0.42,-0.25, gunMats.grip, g);
+  makeBox(0.08,0.28,0.12, 0.26,-0.44,-0.55, gunMats.metal, g);      // curved mag
+  makeBox(0.04,0.06,0.3, 0.26,-0.12,-0.55, gunMats.dark, g);
+  return g;
+}
+function buildSCAR() {
+  const g = new THREE.Group();
+  makeBox(0.17,0.17,0.9, 0.26,-0.24,-0.62, gunMats.blackGun, g);
+  makeBox(0.10,0.10,0.45, 0.26,-0.22,-1.15, gunMats.metal, g);
+  makeBox(0.12,0.3,0.12, 0.26,-0.42,-0.32, gunMats.grip, g);
+  makeBox(0.13,0.26,0.15, 0.26,-0.44,-0.72, gunMats.dark, g);
+  makeBox(0.08,0.08,0.22, 0.26,-0.10,-0.5, gunMats.metal, g);       // sight rail
+  return g;
+}
+function buildMinigun() {
+  const g = new THREE.Group();
+  // body
+  makeBox(0.24,0.24,0.7, 0.28,-0.28,-0.6, gunMats.dark, g);
+  // rotating barrel cluster
+  const barrels = new THREE.Group();
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.9,6), gunMats.metal);
+    b.rotation.x = Math.PI / 2;
+    b.position.set(Math.cos(angle)*0.09, Math.sin(angle)*0.09, -1.1);
+    barrels.add(b);
+  }
+  barrels.name = 'barrels';
+  g.add(barrels);
+  // grip under
+  makeBox(0.12,0.24,0.12, 0.28,-0.5,-0.35, gunMats.grip, g);
+  // ammo box
+  makeBox(0.18,0.26,0.24, 0.28,-0.5,-0.75, gunMats.greenGun, g);
+  g.userData.barrels = barrels;
+  return g;
+}
+function buildAWP() {
+  const g = new THREE.Group();
+  makeBox(0.15,0.15,1.35, 0.26,-0.22,-0.8, gunMats.greenGun, g);    // long body
+  makeBox(0.07,0.07,0.9, 0.26,-0.2,-1.85, gunMats.metal, g);        // long barrel
+  makeBox(0.13,0.13,0.2, 0.26,-0.2,-2.35, gunMats.dark, g);         // muzzle brake
+  // big scope
+  const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.55,10), gunMats.blackGun);
+  scope.rotation.z = Math.PI / 2; scope.rotation.y = 0;
+  scope.position.set(0.26,0.0,-0.75); g.add(scope);
+  makeBox(0.10,0.28,0.12, 0.26,-0.45,-0.42, gunMats.grip, g);       // grip
+  makeBox(0.09,0.22,0.14, 0.26,-0.4,-0.7, gunMats.dark, g);         // mag
   return g;
 }
 function buildGrenadeModel() {
@@ -1058,38 +1412,101 @@ function buildGrenadeModel() {
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8),
     new THREE.MeshLambertMaterial({ color: 0x2f4a2a }));
   body.position.set(0.28, -0.3, -0.5); g.add(body);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.1,8),
+    new THREE.MeshLambertMaterial({ color: 0x777 }));
+  top.position.set(0.28, -0.16, -0.5); g.add(top);
   return g;
 }
-const weaponModels = { rifle: buildRifle(), sniper: buildSniper(), grenade: buildGrenadeModel() };
-for (const k in weaponModels) camera.add(weaponModels[k]);
+
+const WEAPON_MODEL_BUILDERS = {
+  m16: buildM16, ak47: buildAK47, m1916: buildM1916,
+  mp5: buildMP5, scar: buildSCAR, minigun: buildMinigun,
+  awp: buildAWP, grenade: buildGrenadeModel,
+};
+
+// build all models once, hide them, add to camera
+const weaponModels = {};
+for (const id in WEAPON_MODEL_BUILDERS) {
+  const g = WEAPON_MODEL_BUILDERS[id]();
+  g.visible = false;
+  camera.add(g);
+  weaponModels[id] = g;
+}
+
 const muzzle = new THREE.PointLight(0xffcc44, 0, 12);
 muzzle.position.set(0.26,-0.22,-1.3);
 camera.add(muzzle);
 scene.add(camera);
 
-const WEAPONS = [
-  { id: 'rifle',   name: 'RIFLE',   fireRate: 0.1,  auto: true,  spread: 0.012 },
-  { id: 'sniper',  name: 'SNIPER',  fireRate: 1.1,  auto: false, spread: 0.0, zoom: true },
-  { id: 'grenade', name: 'GRENADE', fireRate: 0.8,  auto: false, isGrenade: true }
-];
-let currentWeapon = 0;
-const slotEls = [0,1,2].map(function(i) { return document.getElementById('slot-' + i); });
-function updateHotbar() {
-  slotEls.forEach(function(el, i) { el.classList.toggle('active', i === currentWeapon); });
-  for (let i = 0; i < WEAPONS.length; i++)
-    weaponModels[WEAPONS[i].id].visible = (i === currentWeapon);
+// ================= ACTIVE LOADOUT =================
+// The player's chosen 1-3 weapons for this match.
+let activeLoadout = ['m16', 'grenade'];    // fallback
+let currentWeapon = 0;                     // index into activeLoadout
+let grenadeCharges = 3;                    // current grenades in stock
+let grenadeRefillT = 0;                    // seconds until next grenade refills
+
+function getActiveWeaponId() { return activeLoadout[currentWeapon]; }
+function getActiveWeaponStats() { return WEAPON_STATS[getActiveWeaponId()]; }
+function getActiveWeaponInfo() { return WEAPON_INFO[getActiveWeaponId()]; }
+
+function setupLoadoutForMatch() {
+  let lo = Account.currentLoadout.slice();
+  if (lo.length === 0) lo = ['m16'];
+  if (lo.length > 3) lo = lo.slice(0, 3);
+  // ensure the player actually owns everything in the list
+  if (Account.user && Account.user.ownedWeapons) {
+    const owned = Account.user.ownedWeapons;
+    lo = lo.filter(function(id) { return owned.includes(id); });
+    if (lo.length === 0) lo = ['m16'];
+  }
+  activeLoadout = lo;
+  currentWeapon = 0;
+  updateHotbarUI();
+  updateActiveWeaponModel();
 }
-updateHotbar();
+function updateActiveWeaponModel() {
+  for (const id in weaponModels) weaponModels[id].visible = false;
+  const id = getActiveWeaponId();
+  if (weaponModels[id]) weaponModels[id].visible = true;
+}
 function switchWeapon(i) {
-  if (i === currentWeapon || i < 0 || i >= WEAPONS.length) return;
-  currentWeapon = i; updateHotbar(); Audio.weaponSwitch();
+  if (i === currentWeapon || i < 0 || i >= activeLoadout.length) return;
+  currentWeapon = i;
+  updateHotbarUI();
+  updateActiveWeaponModel();
+  Audio.weaponSwitch();
+}
+function updateHotbarUI() {
+  for (let i = 0; i < 3; i++) {
+    const el = document.getElementById('slot-' + i);
+    if (!el) continue;
+    const id = activeLoadout[i];
+    if (!id) {
+      el.style.display = 'none';
+      continue;
+    }
+    el.style.display = 'flex';
+    const info = WEAPON_INFO[id];
+    const stats = WEAPON_STATS[id];
+    el.querySelector('.icon').textContent = info ? info.icon : '?';
+    el.querySelector('.name').textContent = info ? info.name : '?';
+    const ammoEl = el.querySelector('.ammo');
+    if (id === 'grenade') {
+      ammoEl.textContent = grenadeCharges + '/' + (stats.maxGrenades || 3);
+    } else {
+      ammoEl.textContent = '∞';
+    }
+    el.classList.toggle('active', i === currentWeapon);
+  }
 }
 
-// ================= GRENADES =================
+// ================= GRENADES (thrown projectile) =================
 const liveGrenades = [];
 const grenadeGeo = new THREE.SphereGeometry(0.18, 10, 8);
 const grenadeMat = new THREE.MeshLambertMaterial({ color: 0x3a5a2a });
 function throwGrenade() {
+  const stats = getActiveWeaponStats();
+  if (grenadeCharges <= 0) { Audio.emptyClick(); return false; }
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
   const start = camera.position.clone().add(dir.clone().multiplyScalar(0.6));
   const vel = dir.clone().multiplyScalar(14); vel.y += 6;
@@ -1098,6 +1515,11 @@ function throwGrenade() {
   scene.add(mesh);
   liveGrenades.push({ mesh: mesh, vel: vel, fuse: 2.0, beepT: 0 });
   Audio.grenadeThrow();
+  grenadeCharges--;
+  // start refill timer if it wasn't running
+  if (grenadeRefillT <= 0) grenadeRefillT = stats.refillTime || 12;
+  updateHotbarUI();
+  return true;
 }
 function explode(pos) {
   burst(pos, 0xff8822, 40); burst(pos, 0xffcc44, 25); burst(pos, 0x555555, 30);
@@ -1370,6 +1792,9 @@ function buildSoldierRig(opts) {
 const MAX_ALIVE = 4, SPAWN_DELAY = 3.2;
 let spawnTimer = 0;
 
+// Coin reward per enemy
+const ENEMY_COIN_VALUE = { grunt: 5, rusher: 10, heavy: 25 };
+
 const ENEMY_TYPES = {
   grunt: {
     hp: 30, speed: 2.8, bulletDamage: 4, bulletSpeed: 22,
@@ -1454,10 +1879,14 @@ const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffee88 });
 const eBulletMat = new THREE.MeshBasicMaterial({ color: 0xff5544 });
 const allyBulletMat = new THREE.MeshBasicMaterial({ color: 0x88ddff });
 const sniperBulletMat = new THREE.MeshBasicMaterial({ color: 0xb0f0ff });
-function spawnBullet(from, dir, owner, isSniper, damage, speedOverride) {
+const minigunBulletMat = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
+function spawnBullet(from, dir, owner, isSniper, damage, speedOverride, isMinigun) {
   let mat;
-  if (owner === 'player') mat = isSniper ? sniperBulletMat : bulletMat;
-  else if (owner === 'ally') mat = allyBulletMat;
+  if (owner === 'player') {
+    if (isSniper) mat = sniperBulletMat;
+    else if (isMinigun) mat = minigunBulletMat;
+    else mat = bulletMat;
+  } else if (owner === 'ally') mat = allyBulletMat;
   else mat = eBulletMat;
   const mesh = new THREE.Mesh(bulletGeo, mat);
   mesh.position.copy(from); scene.add(mesh);
@@ -1512,7 +1941,7 @@ addEventListener('keydown', function(e) {
   if (e.code === 'Digit1') switchWeapon(0);
   if (e.code === 'Digit2') switchWeapon(1);
   if (e.code === 'Digit3') switchWeapon(2);
-  if (e.code === 'KeyQ') switchWeapon((currentWeapon + 1) % WEAPONS.length);
+  if (e.code === 'KeyQ') switchWeapon((currentWeapon + 1) % activeLoadout.length);
   if (e.code === 'KeyM') {
     const m = Audio.toggleMute();
     document.getElementById('muteHint').textContent = m ? 'MUTED — M to unmute' : 'M = mute';
@@ -1571,13 +2000,15 @@ function setupMobileControls() {
   btnJump.addEventListener('touchstart', function(e){ e.preventDefault(); mobile.jumpQueued = true; }, {passive:false});
 
   const btnSwap = document.getElementById('btnSwap');
-  btnSwap.addEventListener('touchstart', function(e){ e.preventDefault(); switchWeapon((currentWeapon + 1) % WEAPONS.length); }, {passive:false});
+  btnSwap.addEventListener('touchstart', function(e){ e.preventDefault(); switchWeapon((currentWeapon + 1) % activeLoadout.length); }, {passive:false});
 }
 
 // ================= STATE =================
 let score = 0, shakeT = 0, lastShot = 0;
 let footstepT = 0, wasOnGround = true;
 let killsThisGame = 0;
+let coinsEarnedThisGame = 0;
+let minigunSpin = 0;   // 0..1 spin-up progress
 const clock = new THREE.Clock();
 const zoomVignette = document.getElementById('zoomVignette');
 let gameStarted = false;
@@ -1661,6 +2092,9 @@ function killEnemy(e, impulseDir) {
   e.dead = true;
   killsThisGame++;
   score += e.def ? e.def.scoreValue : 10;
+  const coinValue = ENEMY_COIN_VALUE[e.type] || 5;
+  coinsEarnedThisGame += coinValue;
+  updateCoinHud();
   bloodBurst(e.group.position.clone().add(new THREE.Vector3(0,1.2,0)), 22);
   burst(e.group.position.clone().add(new THREE.Vector3(0,1.2,0)), 0xff2222, 14);
   Audio.enemyDeath();
@@ -1681,9 +2115,32 @@ function killAlly(a) {
   makeCorpseFromRig(a.group, { uniform: allyUniformTex, helmet: 0x1e3a68 }, dir.normalize());
   scene.remove(a.group);
 }
+function updateCoinHud() {
+  document.getElementById('coinCount').textContent = coinsEarnedThisGame;
+}
 
-// ================= START =================
+// ================= SUBMIT SCORE =================
+async function submitScore(finalScore, kills, coinsEarned) {
+  if (!Account.token) return;
+  try {
+    const data = await apiCall('/api/score', { score: finalScore, kills: kills, coinsEarned: coinsEarned });
+    if (Account.user) {
+      Account.user.highScore = data.highScore;
+      Account.user.coins = data.coins;
+    }
+    document.getElementById('deadSave').textContent =
+      '✓ Saved • +' + data.coinsEarned + ' coins (total ' + data.coins + ')';
+  } catch (e) {
+    document.getElementById('deadSave').textContent = 'Could not save: ' + e.message;
+  }
+}
+
+// ================= START GAME =================
 function startGame() {
+  // read current loadout + owned weapons
+  setupLoadoutForMatch();
+  grenadeCharges = 3;
+  grenadeRefillT = 0;
   buildWorld(CONFIG.mapKey);
   player.pos.set(TILE * 1.5, 0, TILE * 1.5);
   player.hp = 100; player.vy = 0; player.onGround = true;
@@ -1708,8 +2165,12 @@ function startGame() {
   spawnTimer = SPAWN_DELAY;
   score = 0;
   killsThisGame = 0;
+  coinsEarnedThisGame = 0;
   scoreSaved = false;
+  minigunSpin = 0;
+  updateCoinHud();
   document.getElementById('score').textContent = '0';
+  updateHotbarUI();
 
   gameStarted = true;
   running = true;
@@ -1749,7 +2210,6 @@ function startGame() {
   function updatePlayState() { playBtn.disabled = !CONFIG.platform || !CONFIG.mapKey; }
   updatePlayState();
 
-  // ---- account buttons ----
   document.getElementById('loginBtn').addEventListener('click', doLogin);
   document.getElementById('registerBtn').addEventListener('click', doRegister);
   document.getElementById('logoutBtn').addEventListener('click', doLogout);
@@ -1760,7 +2220,17 @@ function startGame() {
     if (e.key === 'Enter') doLogin();
   });
 
-  // ---- leaderboard ----
+  // shop / loadout / leaderboard
+  document.getElementById('shopBtn').addEventListener('click', openShop);
+  document.getElementById('shopClose').addEventListener('click', function() {
+    document.getElementById('shopModal').style.display = 'none';
+  });
+  document.getElementById('loadoutBtn').addEventListener('click', openLoadout);
+  document.getElementById('loadoutClose').addEventListener('click', async function() {
+    // save loadout when closing
+    try { await saveLoadout(); } catch (e) {}
+    document.getElementById('loadoutModal').style.display = 'none';
+  });
   document.getElementById('leaderboardBtn').addEventListener('click', showLeaderboard);
   document.getElementById('leaderboardClose').addEventListener('click', function() {
     document.getElementById('leaderboardModal').style.display = 'none';
@@ -1772,7 +2242,6 @@ function startGame() {
     startGame();
   });
 
-  // auto-login if token exists
   tryAutoLogin();
 })();
 
@@ -1807,8 +2276,8 @@ document.addEventListener('mouseup', function(e) {
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 addEventListener('wheel', function(e) {
   if (CONFIG.platform !== 'pc' || !locked) return;
-  if (e.deltaY > 0) switchWeapon((currentWeapon + 1) % WEAPONS.length);
-  else switchWeapon((currentWeapon - 1 + WEAPONS.length) % WEAPONS.length);
+  if (e.deltaY > 0) switchWeapon((currentWeapon + 1) % activeLoadout.length);
+  else switchWeapon((currentWeapon - 1 + activeLoadout.length) % activeLoadout.length);
 });
 
 // ================= MAIN LOOP =================
@@ -1816,9 +2285,36 @@ function loop() {
   requestAnimationFrame(loop);
   if (!running) { renderer.render(scene, camera); return; }
   const dt = Math.min(clock.getDelta(), 0.05);
-  const weapon = WEAPONS[currentWeapon];
+  const weaponId = getActiveWeaponId();
+  const weapon = WEAPON_STATS[weaponId];
   const isMobile = CONFIG.platform === 'mobile';
+  if (!weapon) { renderer.render(scene, camera); return; }
 
+  // grenade refill timer
+  if (grenadeCharges < (WEAPON_STATS.grenade.maxGrenades || 3)) {
+    grenadeRefillT -= dt;
+    if (grenadeRefillT <= 0) {
+      grenadeCharges++;
+      if (grenadeCharges < (WEAPON_STATS.grenade.maxGrenades || 3)) {
+        grenadeRefillT = WEAPON_STATS.grenade.refillTime || 12;
+      } else {
+        grenadeRefillT = 0;
+      }
+      updateHotbarUI();
+    }
+  }
+  // update grenade ammo count on hotbar in real time
+  const grenadeSlotIndex = activeLoadout.indexOf('grenade');
+  if (grenadeSlotIndex >= 0) {
+    const el = document.getElementById('slot-' + grenadeSlotIndex);
+    if (el) {
+      const ammoEl = el.querySelector('.ammo');
+      const txt = grenadeCharges + '/' + (WEAPON_STATS.grenade.maxGrenades || 3);
+      if (ammoEl.textContent !== txt) ammoEl.textContent = txt;
+    }
+  }
+
+  // nametags
   const allTagged = enemies.concat(ally && !ally.dead ? [ally] : []);
   const tmpWp = new THREE.Vector3();
   for (const c of allTagged) {
@@ -1843,6 +2339,7 @@ function loop() {
     }
   }
 
+  // movement
   const forward = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
   const right = new THREE.Vector3(forward.z, 0, -forward.x);
   const move = new THREE.Vector3();
@@ -1857,7 +2354,8 @@ function loop() {
   }
   if (move.lengthSq() > 0) move.normalize();
   const zooming = !isMobile && rightDown && weapon.zoom;
-  const speed = (zooming ? 2.5 : 7) * dt, r = player.radius;
+  const baseSpeed = zooming ? 2.5 : 7;
+  const speed = baseSpeed * (weapon.moveSpeedMul || 1) * dt, r = player.radius;
 
   const tryX = player.pos.x + move.x * speed;
   if (!blockedAt(tryX - r, player.pos.z - r, player.pos.y) &&
@@ -1910,36 +2408,57 @@ function loop() {
     camera.position.y += (Math.random()-0.5) * shakeT * 0.15;
     shakeT = Math.max(0, shakeT - dt * 40);
   }
-  const targetGunZ = (mouseDown || mobile.fireHeld) && lastShot < 0.05 ? 0.06 : 0;
-  if (weaponModels[weapon.id]) {
-    weaponModels[weapon.id].position.z += (targetGunZ - weaponModels[weapon.id].position.z) * 0.3;
-    weaponModels[weapon.id].position.y = bob * 0.5;
+  const firing = isMobile ? mobile.fireHeld : mouseDown;
+  const targetGunZ = firing && lastShot < 0.05 ? 0.06 : 0;
+  if (weaponModels[weaponId]) {
+    weaponModels[weaponId].position.z += (targetGunZ - weaponModels[weaponId].position.z) * 0.3;
+    weaponModels[weaponId].position.y = bob * 0.5;
   }
 
+  // minigun spin-up
+  if (weaponId === 'minigun') {
+    if (firing) minigunSpin = Math.min(1, minigunSpin + dt * 2.5);
+    else minigunSpin = Math.max(0, minigunSpin - dt * 3);
+    const barrels = weaponModels.minigun.userData.barrels;
+    if (barrels) barrels.rotation.z += dt * 20 * minigunSpin;
+  } else {
+    minigunSpin = 0;
+  }
+
+  // shooting
   lastShot += dt;
-  const firing = isMobile ? mobile.fireHeld : mouseDown;
   if (firing && lastShot >= weapon.fireRate) {
-    if (weapon.isGrenade) { throwGrenade(); lastShot = 0; shakeT = 3; }
-    else {
+    if (weapon.isGrenade) {
+      if (throwGrenade()) { lastShot = 0; shakeT = 3; }
+      else { lastShot = 0; } // empty click, but reset so it doesn't spam
+    } else {
       const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-      if (weapon.spread > 0) {
-        dir.x += (Math.random()-0.5) * weapon.spread;
-        dir.y += (Math.random()-0.5) * weapon.spread;
-        dir.z += (Math.random()-0.5) * weapon.spread;
+      let spread = weapon.spread;
+      // minigun only accurate when spinup complete and stationary
+      if (weaponId === 'minigun') {
+        const moving = move.lengthSq() > 0;
+        spread = weapon.spread * (moving ? 2.2 : 1) * (1.6 - minigunSpin * 0.6);
+      }
+      if (spread > 0) {
+        dir.x += (Math.random()-0.5) * spread;
+        dir.y += (Math.random()-0.5) * spread;
+        dir.z += (Math.random()-0.5) * spread;
         dir.normalize();
       }
       const start = camera.position.clone().add(dir.clone().multiplyScalar(1));
-      const dmg = weapon.id === 'sniper' ? 100 : 10;
-      spawnBullet(start, dir, 'player', weapon.id === 'sniper', dmg);
-      muzzle.intensity = weapon.id === 'sniper' ? 6 : 4;
-      shakeT = weapon.id === 'sniper' ? 12 : 4;
-      if (weapon.id === 'sniper') Audio.sniperShot(); else Audio.rifleShot();
+      spawnBullet(start, dir, 'player', weaponId === 'awp', weapon.damage, weapon.bulletSpeed, weaponId === 'minigun');
+      muzzle.intensity = weaponId === 'awp' ? 6 : (weaponId === 'minigun' ? 2 : 4);
+      shakeT = weaponId === 'awp' ? 12 : (weaponId === 'minigun' ? 2 : 4);
+      if (weaponId === 'awp') Audio.sniperShot();
+      else if (weaponId === 'minigun') Audio.minigunShot();
+      else Audio.gunshot(weapon.damage / 60);
       lastShot = 0;
       if (!weapon.auto) { if (isMobile) mobile.fireHeld = false; else mouseDown = false; }
     }
   }
   muzzle.intensity = Math.max(0, muzzle.intensity - dt * 30);
 
+  // player bullets
   for (const b of bullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -1948,7 +2467,7 @@ function loop() {
     if ((cell.type !== 0 && b.mesh.position.y < cell.h) || b.life <= 0) hit = true;
     if (b.mesh.position.y < 0) hit = true;
     if (hit) {
-      if (b.life > 0) { burst(b.mesh.position, b.isSniper ? 0x88ddff : 0xbbbbbb, 4); Audio.wallHit(); }
+      if (b.life > 0) { burst(b.mesh.position, 0xbbbbbb, 4); Audio.wallHit(); }
       b.life = 0; continue;
     }
     for (const e of enemies) {
@@ -2020,6 +2539,7 @@ function loop() {
     if (gr.fuse <= 0) { explode(gr.mesh.position.clone()); scene.remove(gr.mesh); liveGrenades.splice(i, 1); }
   }
 
+  // enemy AI
   for (const e of enemies) {
     if (e.dead) continue;
     const def = e.def;
@@ -2143,6 +2663,7 @@ function loop() {
     }
   }
 
+  // ally AI
   if (ally && !ally.dead) {
     const a = ally;
     let ag = 0;
@@ -2229,7 +2750,7 @@ function loop() {
         dir.z += (Math.random()-0.5) * 0.5;
         dir.normalize();
         spawnBullet(muzzlePos, dir, 'ally', false, 10, 40);
-        Audio.rifleShot();
+        Audio.gunshot(0.2);
         a.fireCd = 0.35 + Math.random() * 0.35;
       }
     }
@@ -2242,6 +2763,7 @@ function loop() {
 
   updateCorpses(dt);
 
+  // particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
@@ -2271,10 +2793,11 @@ function loop() {
   if (player.hp <= 0) {
     document.getElementById('dead').style.display = 'flex';
     document.getElementById('deadScore').textContent = 'Score: ' + score;
+    document.getElementById('deadCoins').textContent = '🪙 +' + coinsEarnedThisGame + ' coins earned';
     if (!scoreSaved) {
       scoreSaved = true;
-      document.getElementById('deadSave').textContent = Account.token ? 'Saving score...' : 'Log in to save your score';
-      if (Account.token) submitScore(score, killsThisGame);
+      document.getElementById('deadSave').textContent = Account.token ? 'Saving score...' : 'Log in to save score';
+      if (Account.token) submitScore(score, killsThisGame, coinsEarnedThisGame);
     }
     running = false;
     if (CONFIG.platform === 'pc') document.exitPointerLock();
