@@ -102,6 +102,46 @@
   #playBtn:active { transform: translateY(-2px); }
   #playBtn:disabled { background: #333; border-color: #555; color: #888; box-shadow: none; }
 
+  #leaderboardBtn {
+    margin-top: 12px; padding: 12px 40px; font-size: 16px; font-weight: bold;
+    letter-spacing: 2px; background: rgba(30,60,110,0.85);
+    border: 3px solid #8af; border-radius: 10px; color: #fff; cursor: pointer;
+    font-family: monospace; box-shadow: 0 4px 18px rgba(74,158,255,0.4);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #leaderboardBtn:active { transform: translateY(-2px); }
+
+  #leaderboardModal {
+    position: fixed; inset: 0; z-index: 200; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(5,10,20,0.95); color: #fff;
+    padding: 20px; text-align: center;
+  }
+  #leaderboardModal h2 { color: #4a9eff; margin: 0 0 20px;
+    text-shadow: 0 0 20px #4a9eff; letter-spacing: 3px; font-size: 28px; }
+  #leaderboardList {
+    width: 100%; max-width: 500px; max-height: 60vh; overflow-y: auto;
+    background: rgba(20,30,50,0.8); border: 2px solid rgba(90,150,220,0.4);
+    border-radius: 12px; padding: 10px; font-family: monospace; font-size: 14px;
+  }
+  .lb-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; margin: 4px 0; background: rgba(0,0,0,0.3);
+    border-radius: 8px; border-left: 4px solid transparent;
+  }
+  .lb-row.top1 { border-left-color: #ffd700; background: rgba(255,215,0,0.12); }
+  .lb-row.top2 { border-left-color: #c0c0c0; background: rgba(192,192,192,0.1); }
+  .lb-row.top3 { border-left-color: #cd7f32; background: rgba(205,127,50,0.1); }
+  .lb-row.me { border-left-color: #4bea8b; background: rgba(75,234,139,0.15); }
+  .lb-rank { color: #8af; width: 40px; text-align: left; font-weight: bold; }
+  .lb-name { flex: 1; text-align: left; color: #fff; }
+  .lb-score { color: #4bea8b; font-weight: bold; }
+  #leaderboardClose {
+    margin-top: 20px; padding: 12px 40px; font: bold 16px monospace; letter-spacing: 2px;
+    background: #4a9eff; border: 2px solid #8cf; border-radius: 8px; color: #fff;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+
   /* ============ ACCOUNT PANEL ============ */
   #accountPanel {
     width: 320px; max-width: 90vw; margin: 0 auto 20px; padding: 14px;
@@ -259,6 +299,13 @@
   </div>
 
   <button id="playBtn" disabled>▶ PLAY</button>
+  <button id="leaderboardBtn">🏆 LEADERBOARD</button>
+</div>
+
+<div id="leaderboardModal">
+  <h2>🏆 GLOBAL LEADERBOARD</h2>
+  <div id="leaderboardList">Loading...</div>
+  <button id="leaderboardClose">CLOSE</button>
 </div>
 
 <div id="hud">
@@ -414,6 +461,44 @@ async function tryAutoLogin() {
     localStorage.removeItem('bs_token');
     showLoggedOut();
   }
+}
+
+async function showLeaderboard() {
+  const modal = document.getElementById('leaderboardModal');
+  const list = document.getElementById('leaderboardList');
+  modal.style.display = 'flex';
+  list.innerHTML = 'Loading...';
+  try {
+    const data = await apiCall('/api/leaderboard');
+    const board = data.leaderboard || [];
+    if (board.length === 0) {
+      list.innerHTML = '<div style="padding:20px;color:#888">No scores yet — be the first!</div>';
+      return;
+    }
+    list.innerHTML = '';
+    board.forEach(function(row, i) {
+      const div = document.createElement('div');
+      div.className = 'lb-row';
+      if (i === 0) div.classList.add('top1');
+      else if (i === 1) div.classList.add('top2');
+      else if (i === 2) div.classList.add('top3');
+      if (Account.user && row.username === Account.user.username) div.classList.add('me');
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
+      div.innerHTML =
+        '<span class="lb-rank">' + medal + '</span>' +
+        '<span class="lb-name">' + escapeHtml(row.username) + '</span>' +
+        '<span class="lb-score">' + (row.highScore || 0) + '</span>';
+      list.appendChild(div);
+    });
+  } catch (e) {
+    list.innerHTML = '<div style="padding:20px;color:#ff6b6b">Could not load leaderboard: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
 }
 
 // ================= SOUND ENGINE =================
@@ -1671,9 +1756,14 @@ function startGame() {
   document.getElementById('skipBtn').addEventListener('click', function() {
     document.getElementById('accountPanel').style.display = 'none';
   });
-  // allow Enter key to log in
   document.getElementById('passwordInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doLogin();
+  });
+
+  // ---- leaderboard ----
+  document.getElementById('leaderboardBtn').addEventListener('click', showLeaderboard);
+  document.getElementById('leaderboardClose').addEventListener('click', function() {
+    document.getElementById('leaderboardModal').style.display = 'none';
   });
 
   playBtn.addEventListener('click', function() {
