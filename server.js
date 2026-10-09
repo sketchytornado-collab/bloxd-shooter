@@ -3,8 +3,8 @@ process.on('uncaughtException', (e) => { console.error('CRASH:', e && e.stack ||
 process.on('unhandledRejection', (e) => { console.error('REJECT:', e && e.stack || e); });
 
 // ============================================================
-//  BLOCKY SHOOTER — server.js (Upstash Redis)
-//  Accounts survive redeploys.
+//  BLOCKY SHOOTER — server.js (Upstash Redis + Weapons Shop)
+//  Accounts, coins, owned weapons, loadouts — survives redeploys.
 // ============================================================
 
 const http = require('http');
@@ -19,12 +19,28 @@ const ADMIN_NAME = process.env.ADMIN_USER || 'Just_12yrs_old';
 
 const redis = Redis.fromEnv();
 
+// ---------- WEAPON CATALOG ----------
+// Server is the source of truth for prices & ownership.
+// Stats live in the client (index.html) but the ID + price live here.
+const WEAPON_CATALOG = {
+  m16:     { price: 0,    name: 'M16' },
+  ak47:    { price: 800,  name: 'AK47' },
+  m1916:   { price: 1200, name: 'M1916' },
+  mp5:     { price: 1500, name: 'MP5' },
+  scar:    { price: 2000, name: 'SCAR-H' },
+  minigun: { price: 3000, name: 'Minigun' },
+  awp:     { price: 3500, name: 'AWP' },
+  grenade: { price: 0,    name: 'Grenade' },
+};
+
 // ---------- auth ----------
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
+
 function makeUser(username, password) {
   const salt = crypto.randomBytes(16).toString('hex');
+  const isAdmin = username === ADMIN_NAME;
   return {
     username: username,
     salt: salt,
@@ -35,17 +51,30 @@ function makeUser(username, password) {
     highScore: 0,
     totalKills: 0,
     gamesPlayed: 0,
+    coins: isAdmin ? 999999 : 0,
+    // default owned: M16 + Grenade. Admin owns everything.
+    ownedWeapons: isAdmin
+      ? Object.keys(WEAPON_CATALOG).join(',')
+      : 'm16,grenade',
+    // default loadout: M16, sniper-ish (nothing bought yet) — but only owned ones
+    loadout: isAdmin ? 'ak47,awp,grenade' : 'm16,grenade',
     rank: 'Recruit',
     isBanned: 'false',
-    isAdmin: username === ADMIN_NAME ? 'true' : 'false',
+    isAdmin: isAdmin ? 'true' : 'false',
   };
 }
+
 function publicUser(u) {
+  const owned = (u.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
+  const loadout = (u.loadout || 'm16,grenade').split(',').filter(Boolean);
   return {
     username: u.username,
     highScore: Number(u.highScore) || 0,
     totalKills: Number(u.totalKills) || 0,
     gamesPlayed: Number(u.gamesPlayed) || 0,
+    coins: Number(u.coins) || 0,
+    ownedWeapons: owned,
+    loadout: loadout,
     rank: u.rank || 'Recruit',
     last_save: u.lastSave ? Number(u.lastSave) : null,
     isAdmin: u.isAdmin === 'true' || u.isAdmin === true,
@@ -57,6 +86,10 @@ async function getUser(username) {
   if (!username) return null;
   const data = await redis.hgetall('user:' + username);
   if (!data || Object.keys(data).length === 0) return null;
+  // fill in missing fields for older accounts
+  if (data.coins === undefined) data.coins = '0';
+  if (data.ownedWeapons === undefined) data.ownedWeapons = 'm16,grenade';
+  if (data.loadout === undefined) data.loadout = 'm16,grenade';
   return data;
 }
 async function saveUser(user) {
@@ -114,6 +147,11 @@ const routes = {
     }
   },
 
+  // public catalog so client can display prices/names
+  'GET /api/weapons': (req, res) => {
+    sendJSON(res, 200, { weapons: WEAPON_CATALOG });
+  },
+
   'POST /api/register': async (req, res) => {
     const body = await readBody(req);
     const username = body.username;
@@ -168,6 +206,77 @@ const routes = {
     sendJSON(res, 200, { success: true, user: publicUser(user) });
   },
 
+  // ---- buy a weapon with coins ----
+  'POST /api/buy-weapon': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
+
+    const body = await readBody(req);
+    const weaponId = String(body.weaponId || '').toLowerCase();
+    const def = WEAPON_CATALOG[weaponId];
+    if (!def) return sendJSON(res, 400, { success: false, error: 'Unknown weapon' });
+
+    const owned = (user.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
+    if (owned.includes(weaponId)) {
+      return sendJSON(res, 400, { success: false, error: 'You already own this weapon' });
+    }
+
+    const isAdmin = user.isAdmin === 'true' || user.isAdmin === true;
+    const coins = Number(user.coins) || 0;
+
+    // Admin gets it free
+    if (!isAdmin) {
+      if (coins < def.price) {
+        return sendJSON(res, 400, { success: false, error: 'Not enough coins' });
+      }
+      user.coins = String(coins - def.price);
+    }
+
+    owned.push(weaponId);
+    user.ownedWeapons = owned.join(',');
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+
+    sendJSON(res, 200, {
+      success: true,
+      message: 'Bought ' + def.name + '!',
+      user: publicUser(user),
+    });
+  },
+
+  // ---- save loadout (which weapons to bring) ----
+  'POST /api/save-loadout': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
+
+    const body = await readBody(req);
+    const loadout = Array.isArray(body.loadout) ? body.loadout : [];
+    if (loadout.length < 1 || loadout.length > 3) {
+      return sendJSON(res, 400, { success: false, error: 'Bring 1 to 3 weapons' });
+    }
+
+    const owned = (user.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
+    // validate every weapon in the loadout is owned
+    for (let i = 0; i < loadout.length; i++) {
+      const id = String(loadout[i] || '').toLowerCase();
+      if (!WEAPON_CATALOG[id]) return sendJSON(res, 400, { success: false, error: 'Unknown weapon: ' + id });
+      if (!owned.includes(id)) return sendJSON(res, 400, { success: false, error: 'You do not own: ' + id });
+    }
+
+    // dedupe
+    const unique = [];
+    for (let i = 0; i < loadout.length; i++) {
+      const id = String(loadout[i]).toLowerCase();
+      if (!unique.includes(id)) unique.push(id);
+    }
+    user.loadout = unique.join(',');
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+
+    sendJSON(res, 200, { success: true, loadout: unique });
+  },
+
+  // ---- submit score + award coins ----
   'POST /api/score': async (req, res) => {
     const user = await authUser(req);
     if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
@@ -177,10 +286,18 @@ const routes = {
       return sendJSON(res, 400, { success: false, error: 'Invalid score' });
     }
 
+    // Coins awarded per kill are sent by the client as an aggregate "coinsEarned".
+    // Cap it to prevent blatant tampering.
+    let coinsEarned = 0;
+    if (typeof body.coinsEarned === 'number' && isFinite(body.coinsEarned)) {
+      coinsEarned = Math.max(0, Math.min(50000, Math.floor(body.coinsEarned)));
+    }
+
     user.gamesPlayed = String((Number(user.gamesPlayed) || 0) + 1);
     user.totalKills = String((Number(user.totalKills) || 0) + (typeof body.kills === 'number' ? Math.max(0, Math.floor(body.kills)) : 0));
     const newHigh = Math.floor(body.score);
     if (newHigh > (Number(user.highScore) || 0)) user.highScore = String(newHigh);
+    user.coins = String((Number(user.coins) || 0) + coinsEarned);
     user.lastSave = String(Date.now());
     user.lastSeen = String(Date.now());
     await saveUser(user);
@@ -190,6 +307,8 @@ const routes = {
       highScore: Number(user.highScore),
       totalKills: Number(user.totalKills),
       gamesPlayed: Number(user.gamesPlayed),
+      coins: Number(user.coins),
+      coinsEarned: coinsEarned,
       message: 'Score saved!',
     });
   },
@@ -205,6 +324,7 @@ const routes = {
         highScore: Number(data.highScore) || 0,
         totalKills: Number(data.totalKills) || 0,
         gamesPlayed: Number(data.gamesPlayed) || 0,
+        coins: Number(data.coins) || 0,
         rank: data.rank || 'Recruit',
         is_admin: (data.isAdmin === 'true' || data.isAdmin === true) ? 1 : 0,
         last_save: data.lastSave ? Number(data.lastSave) : null,
