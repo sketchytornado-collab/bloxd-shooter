@@ -115,7 +115,6 @@
   }
   #shopBtn:active, #loadoutBtn:active, #leaderboardBtn:active { transform: translateY(-2px); }
 
-  /* ============ ACCOUNT PANEL ============ */
   #accountPanel {
     width: 320px; max-width: 90vw; margin: 0 auto 20px; padding: 14px;
     background: rgba(15,25,45,0.85); border: 2px solid rgba(90,150,220,0.4);
@@ -154,7 +153,6 @@
                border: 2px solid #666; color: #ccc; border-radius: 6px;
                font: 11px monospace; cursor: pointer; }
 
-  /* ============ MODALS (shop / loadout / leaderboard) ============ */
   .modal {
     position: fixed; inset: 0; z-index: 200; display: none;
     flex-direction: column; align-items: center; justify-content: flex-start;
@@ -171,7 +169,6 @@
     cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
 
-  /* shop grid */
   #shopGrid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 12px; max-width: 720px; width: 100%;
@@ -194,7 +191,6 @@
   .shopCard .buyBtn:disabled { background: #444; border-color: #666; color: #999; cursor: default; }
   .shopCard .ownedTag { color: #4bea8b; font-weight: bold; padding: 8px; }
 
-  /* loadout */
   #loadoutSlots {
     display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;
   }
@@ -230,7 +226,6 @@
   #loadoutMsg.error { color: #ff6b6b; }
   #loadoutMsg.ok { color: #4bea8b; }
 
-  /* leaderboard */
   #leaderboardList {
     width: 100%; max-width: 500px; max-height: 60vh; overflow-y: auto;
     background: rgba(20,30,50,0.8); border: 2px solid rgba(90,150,220,0.4);
@@ -373,7 +368,6 @@
   </div>
 </div>
 
-<!-- SHOP -->
 <div id="shopModal" class="modal">
   <h2>🛒 WEAPON SHOP</h2>
   <div style="color:#ffd94a;font-size:16px;margin-bottom:16px">YOUR COINS: <span id="shopCoins">0</span></div>
@@ -381,7 +375,6 @@
   <button class="closeBtn" id="shopClose">CLOSE</button>
 </div>
 
-<!-- LOADOUT -->
 <div id="loadoutModal" class="modal">
   <h2>🎒 LOADOUT</h2>
   <div style="color:#9ab;font-size:13px;margin-bottom:14px">Choose 1 to 3 weapons. Click owned weapons below.</div>
@@ -396,7 +389,6 @@
   <button class="closeBtn" id="loadoutClose">CLOSE</button>
 </div>
 
-<!-- LEADERBOARD -->
 <div id="leaderboardModal" class="modal">
   <h2>🏆 GLOBAL LEADERBOARD</h2>
   <div id="leaderboardList">Loading...</div>
@@ -454,7 +446,7 @@
 // ================= GAME CONFIG =================
 const CONFIG = { platform: 'pc', mapKey: 'bomb' };
 
-// ================= WEAPON CATALOG (client-side, matches server) =================
+// ================= WEAPON CATALOG =================
 const WEAPON_INFO = {
   m16:     { name: 'M16',     price: 0,    icon: '🔫' },
   ak47:    { name: 'AK47',    price: 800,  icon: '🔫' },
@@ -466,24 +458,21 @@ const WEAPON_INFO = {
   grenade: { name: 'Grenade', price: 0,    icon: '💣' },
 };
 
-// ================= WEAPON STATS =================
-// Each weapon: fireRate, auto, damage, spread, bulletSpeed, moveSpeedMul, zoom
 const WEAPON_STATS = {
-  m16:     { fireRate: 0.10, auto: true,  damage: 12, spread: 0.012, bulletSpeed: 45,  moveSpeedMul: 1.0,  isGrenade: false, ammo: '∞' },
-  ak47:    { fireRate: 0.13, auto: true,  damage: 20, spread: 0.020, bulletSpeed: 44,  moveSpeedMul: 0.95, isGrenade: false, ammo: '∞' },
-  m1916:   { fireRate: 0.55, auto: false, damage: 55, spread: 0.010, bulletSpeed: 60,  moveSpeedMul: 0.9,  isGrenade: false, ammo: '∞' },
-  mp5:     { fireRate: 0.06, auto: true,  damage: 8,  spread: 0.030, bulletSpeed: 40,  moveSpeedMul: 1.05, isGrenade: false, ammo: '∞' },
-  scar:    { fireRate: 0.14, auto: true,  damage: 26, spread: 0.018, bulletSpeed: 50,  moveSpeedMul: 0.9,  isGrenade: false, ammo: '∞' },
-  minigun: { fireRate: 0.035, auto: true, damage: 10, spread: 0.055, bulletSpeed: 42,  moveSpeedMul: 0.65, isGrenade: false, ammo: '∞', spinup: true },
-  awp:     { fireRate: 1.3,  auto: false, damage: 150, spread: 0.0,  bulletSpeed: 120, moveSpeedMul: 0.85, isGrenade: false, ammo: '∞', zoom: true },
-  grenade: { fireRate: 0.8,  auto: false, damage: 0,   spread: 0,    bulletSpeed: 0,   moveSpeedMul: 1.0,  isGrenade: true, ammo: '∞', maxGrenades: 3, refillTime: 12 },
+  m16:     { fireRate: 0.10, auto: true,  damage: 12, spread: 0.012, bulletSpeed: 45,  moveSpeedMul: 1.0,  isGrenade: false },
+  ak47:    { fireRate: 0.13, auto: true,  damage: 20, spread: 0.020, bulletSpeed: 44,  moveSpeedMul: 0.95, isGrenade: false },
+  m1916:   { fireRate: 0.55, auto: false, damage: 55, spread: 0.010, bulletSpeed: 60,  moveSpeedMul: 0.9,  isGrenade: false },
+  mp5:     { fireRate: 0.06, auto: true,  damage: 8,  spread: 0.030, bulletSpeed: 40,  moveSpeedMul: 1.05, isGrenade: false },
+  scar:    { fireRate: 0.14, auto: true,  damage: 26, spread: 0.018, bulletSpeed: 50,  moveSpeedMul: 0.9,  isGrenade: false },
+  minigun: { fireRate: 0.035, auto: true, damage: 10, spread: 0.055, bulletSpeed: 42,  moveSpeedMul: 0.65, isGrenade: false },
+  awp:     { fireRate: 1.3,  auto: false, damage: 150, spread: 0.0,  bulletSpeed: 120, moveSpeedMul: 0.85, isGrenade: false, zoom: true },
+  grenade: { fireRate: 0.8,  auto: false, damage: 0,   spread: 0,    bulletSpeed: 0,   moveSpeedMul: 1.0,  isGrenade: true, maxGrenades: 3, refillTime: 12 },
 };
 
-// ================= ACCOUNT STATE =================
+// ================= ACCOUNT =================
 const Account = {
   token: localStorage.getItem('bs_token') || null,
   user: null,
-  // Loadout for the current match (up to 3 weapon ids)
   currentLoadout: (function() {
     try {
       const saved = localStorage.getItem('bs_loadout');
@@ -535,7 +524,6 @@ async function doLogin() {
     Account.token = data.token;
     Account.user = data.user;
     localStorage.setItem('bs_token', data.token);
-    // sync loadout from server
     if (data.user.loadout && data.user.loadout.length > 0) {
       Account.currentLoadout = data.user.loadout.slice();
       localStorage.setItem('bs_loadout', JSON.stringify(Account.currentLoadout));
@@ -590,10 +578,7 @@ async function tryAutoLogin() {
 
 // ================= SHOP =================
 function openShop() {
-  if (!Account.user) {
-    alert('You must log in to use the shop.');
-    return;
-  }
+  if (!Account.user) { alert('You must log in to use the shop.'); return; }
   const modal = document.getElementById('shopModal');
   modal.style.display = 'flex';
   document.getElementById('shopCoins').textContent = Account.user.coins || 0;
@@ -605,7 +590,6 @@ function renderShop() {
   const owned = Account.user.ownedWeapons || [];
   const isAdmin = Account.user.isAdmin;
   const coins = Account.user.coins || 0;
-
   const order = ['m16', 'ak47', 'm1916', 'mp5', 'scar', 'minigun', 'awp', 'grenade'];
   order.forEach(function(id) {
     const info = WEAPON_INFO[id];
@@ -614,19 +598,16 @@ function renderShop() {
     const card = document.createElement('div');
     card.className = 'shopCard';
     const alreadyOwned = owned.includes(id);
-
     let statLine = '';
     if (stats.isGrenade) {
       statLine = 'Max ' + (stats.maxGrenades || 3) + ' • Refill ' + (stats.refillTime || 12) + 's';
     } else {
       statLine = 'DMG ' + stats.damage + ' • Rate ' + (1/stats.fireRate).toFixed(1) + '/s';
     }
-
     card.innerHTML =
       '<div class="wName">' + info.name + '</div>' +
       '<div class="wIcon">' + info.icon + '</div>' +
       '<div class="wStats">' + statLine + '</div>';
-
     if (alreadyOwned) {
       card.classList.add('owned');
       const tag = document.createElement('div');
@@ -663,10 +644,7 @@ async function buyWeapon(id) {
 
 // ================= LOADOUT =================
 function openLoadout() {
-  if (!Account.user) {
-    alert('You must log in to manage your loadout.');
-    return;
-  }
+  if (!Account.user) { alert('You must log in to manage your loadout.'); return; }
   document.getElementById('loadoutModal').style.display = 'flex';
   document.getElementById('loadoutMsg').textContent = '';
   renderLoadout();
@@ -674,8 +652,6 @@ function openLoadout() {
 function renderLoadout() {
   const owned = Account.user.ownedWeapons || ['m16'];
   const loadout = Account.currentLoadout || [];
-
-  // slots
   const slotEls = document.querySelectorAll('.loadSlot');
   slotEls.forEach(function(el, i) {
     const id = loadout[i];
@@ -690,7 +666,6 @@ function renderLoadout() {
       el.innerHTML = '<span class="slotLabel">SLOT ' + (i+1) + '</span>';
     }
   });
-  // wire up remove buttons
   document.querySelectorAll('.removeBtn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -699,8 +674,6 @@ function renderLoadout() {
       renderLoadout();
     });
   });
-
-  // owned weapons grid
   const grid = document.getElementById('loadoutOwned');
   grid.innerHTML = '';
   owned.forEach(function(id) {
@@ -777,7 +750,7 @@ function escapeHtml(s) {
   });
 }
 
-// ================= SOUND ENGINE =================
+// ================= SOUND =================
 const Audio = (function() {
   let ctx = null, master = null, muted = false, ambientStarted = false;
   function init() {
@@ -826,7 +799,6 @@ const Audio = (function() {
     src.connect(flt); flt.connect(gain); gain.connect(master);
     src.start(t0); src.stop(t0 + (o.attack || 0.001) + dec + 0.05);
   }
-  // Generic gunshot — pitches/filters scale with "power" (0..1) for weapon variety
   function gunshot(power) {
     power = Math.max(0, Math.min(1, power || 0.4));
     const bright = 2600 - power * 800;
@@ -1310,7 +1282,6 @@ function redrawHealthBar(sprite, ratio) {
 }
 
 // ================= WEAPON MODELS =================
-// Each weapon has its own 3D model attached to the camera when equipped.
 const gunMats = {
   dark:      new THREE.MeshLambertMaterial({ color: 0x2a2f38 }),
   metal:     new THREE.MeshLambertMaterial({ color: 0x4a5260 }),
@@ -1340,17 +1311,17 @@ function buildAK47() {
   const g = new THREE.Group();
   makeBox(0.16,0.16,0.85, 0.26,-0.24,-0.6, gunMats.dark, g);
   makeBox(0.10,0.10,0.4, 0.26,-0.22,-1.1, gunMats.metal, g);
-  makeBox(0.12,0.3,0.14, 0.26,-0.42,-0.3, gunMats.akWood, g);      // wood grip
-  makeBox(0.14,0.24,0.16, 0.26,-0.44,-0.65, gunMats.dark, g);       // big mag
-  makeBox(0.06,0.06,0.5, 0.26,-0.10,-0.4, gunMats.akWood, g);       // wood handguard
+  makeBox(0.12,0.3,0.14, 0.26,-0.42,-0.3, gunMats.akWood, g);
+  makeBox(0.14,0.24,0.16, 0.26,-0.44,-0.65, gunMats.dark, g);
+  makeBox(0.06,0.06,0.5, 0.26,-0.10,-0.4, gunMats.akWood, g);
   return g;
 }
 function buildM1916() {
   const g = new THREE.Group();
-  makeBox(0.14,0.14,1.1, 0.26,-0.24,-0.7, gunMats.wood, g);         // long wood stock
-  makeBox(0.08,0.08,0.7, 0.26,-0.22,-1.45, gunMats.metal, g);       // long barrel
-  makeBox(0.10,0.30,0.12, 0.26,-0.42,-0.35, gunMats.dark, g);       // grip
-  makeBox(0.06,0.10,0.5, 0.26,-0.10,-0.9, gunMats.dark, g);         // scope rail
+  makeBox(0.14,0.14,1.1, 0.26,-0.24,-0.7, gunMats.wood, g);
+  makeBox(0.08,0.08,0.7, 0.26,-0.22,-1.45, gunMats.metal, g);
+  makeBox(0.10,0.30,0.12, 0.26,-0.42,-0.35, gunMats.dark, g);
+  makeBox(0.06,0.10,0.5, 0.26,-0.10,-0.9, gunMats.dark, g);
   makeBox(0.10,0.10,0.28, 0.26,-0.02,-1.0, gunMats.metal, g);
   return g;
 }
@@ -1359,7 +1330,7 @@ function buildMP5() {
   makeBox(0.14,0.14,0.55, 0.26,-0.24,-0.45, gunMats.dark, g);
   makeBox(0.08,0.08,0.28, 0.26,-0.22,-0.82, gunMats.metal, g);
   makeBox(0.11,0.24,0.11, 0.26,-0.42,-0.25, gunMats.grip, g);
-  makeBox(0.08,0.28,0.12, 0.26,-0.44,-0.55, gunMats.metal, g);      // curved mag
+  makeBox(0.08,0.28,0.12, 0.26,-0.44,-0.55, gunMats.metal, g);
   makeBox(0.04,0.06,0.3, 0.26,-0.12,-0.55, gunMats.dark, g);
   return g;
 }
@@ -1369,42 +1340,19 @@ function buildSCAR() {
   makeBox(0.10,0.10,0.45, 0.26,-0.22,-1.15, gunMats.metal, g);
   makeBox(0.12,0.3,0.12, 0.26,-0.42,-0.32, gunMats.grip, g);
   makeBox(0.13,0.26,0.15, 0.26,-0.44,-0.72, gunMats.dark, g);
-  makeBox(0.08,0.08,0.22, 0.26,-0.10,-0.5, gunMats.metal, g);       // sight rail
-  return g;
-}
-function buildMinigun() {
-  const g = new THREE.Group();
-  // body
-  makeBox(0.24,0.24,0.7, 0.28,-0.28,-0.6, gunMats.dark, g);
-  // rotating barrel cluster
-  const barrels = new THREE.Group();
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2;
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.9,6), gunMats.metal);
-    b.rotation.x = Math.PI / 2;
-    b.position.set(Math.cos(angle)*0.09, Math.sin(angle)*0.09, -1.1);
-    barrels.add(b);
-  }
-  barrels.name = 'barrels';
-  g.add(barrels);
-  // grip under
-  makeBox(0.12,0.24,0.12, 0.28,-0.5,-0.35, gunMats.grip, g);
-  // ammo box
-  makeBox(0.18,0.26,0.24, 0.28,-0.5,-0.75, gunMats.greenGun, g);
-  g.userData.barrels = barrels;
+  makeBox(0.08,0.08,0.22, 0.26,-0.10,-0.5, gunMats.metal, g);
   return g;
 }
 function buildAWP() {
   const g = new THREE.Group();
-  makeBox(0.15,0.15,1.35, 0.26,-0.22,-0.8, gunMats.greenGun, g);    // long body
-  makeBox(0.07,0.07,0.9, 0.26,-0.2,-1.85, gunMats.metal, g);        // long barrel
-  makeBox(0.13,0.13,0.2, 0.26,-0.2,-2.35, gunMats.dark, g);         // muzzle brake
-  // big scope
+  makeBox(0.15,0.15,1.35, 0.26,-0.22,-0.8, gunMats.greenGun, g);
+  makeBox(0.07,0.07,0.9, 0.26,-0.2,-1.85, gunMats.metal, g);
+  makeBox(0.13,0.13,0.2, 0.26,-0.2,-2.35, gunMats.dark, g);
   const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.55,10), gunMats.blackGun);
   scope.rotation.z = Math.PI / 2; scope.rotation.y = 0;
   scope.position.set(0.26,0.0,-0.75); g.add(scope);
-  makeBox(0.10,0.28,0.12, 0.26,-0.45,-0.42, gunMats.grip, g);       // grip
-  makeBox(0.09,0.22,0.14, 0.26,-0.4,-0.7, gunMats.dark, g);         // mag
+  makeBox(0.10,0.28,0.12, 0.26,-0.45,-0.42, gunMats.grip, g);
+  makeBox(0.09,0.22,0.14, 0.26,-0.4,-0.7, gunMats.dark, g);
   return g;
 }
 function buildGrenadeModel() {
@@ -1418,13 +1366,70 @@ function buildGrenadeModel() {
   return g;
 }
 
+// ===== MINIGUN (fixed) =====
+// Sits to the RIGHT of screen, slanted inward, with 6 thin tubes
+// spinning around a central axle. No more center-screen blob.
+function buildMinigun() {
+  const g = new THREE.Group();
+
+  // ---- body (fat dark box, right of screen) ----
+  makeBox(0.26,0.26,0.7, 0.46,-0.30,-0.60, gunMats.dark, g);
+
+  // ---- barrel cluster (spinning assembly) ----
+  const barrels = new THREE.Group();
+  const tubeGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.78, 8);
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const b = new THREE.Mesh(tubeGeo, gunMats.metal);
+    b.rotation.x = Math.PI / 2;                    // point forward (-Z)
+    b.position.set(Math.cos(angle) * 0.075, Math.sin(angle) * 0.075, 0);
+    barrels.add(b);
+  }
+  // central axle
+  const axle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.028, 0.85, 8),
+    gunMats.blackGun
+  );
+  axle.rotation.x = Math.PI / 2;
+  barrels.add(axle);
+  // front and rear rings (bind the tubes visually)
+  const ringGeo = new THREE.TorusGeometry(0.085, 0.016, 6, 14);
+  const ringFront = new THREE.Mesh(ringGeo, gunMats.metal);
+  ringFront.position.z = -0.34;
+  barrels.add(ringFront);
+  const ringBack = new THREE.Mesh(ringGeo, gunMats.metal);
+  ringBack.position.z = 0.34;
+  barrels.add(ringBack);
+
+  // Position the cluster forward of the body, offset to the right.
+  barrels.position.set(0.46, -0.30, -1.10);
+  // Small tilt so it feels angled inward toward the crosshair
+  barrels.rotation.x = -0.08;
+  barrels.rotation.z = 0.05;
+  barrels.name = 'barrels';
+  g.add(barrels);
+
+  // ---- grip under the body ----
+  makeBox(0.12,0.26,0.12, 0.46,-0.55,-0.35, gunMats.grip, g);
+
+  // ---- ammo box on the side ----
+  makeBox(0.22,0.30,0.28, 0.60,-0.52,-0.7, gunMats.greenGun, g);
+  // gold ammo belt
+  makeBox(0.06,0.06,0.35, 0.56,-0.42,-0.5, gunMats.gold, g);
+
+  // ---- small top handle ----
+  makeBox(0.18,0.05,0.32, 0.46,-0.10,-0.55, gunMats.blackGun, g);
+
+  g.userData.barrels = barrels;
+  return g;
+}
+
 const WEAPON_MODEL_BUILDERS = {
   m16: buildM16, ak47: buildAK47, m1916: buildM1916,
   mp5: buildMP5, scar: buildSCAR, minigun: buildMinigun,
   awp: buildAWP, grenade: buildGrenadeModel,
 };
 
-// build all models once, hide them, add to camera
 const weaponModels = {};
 for (const id in WEAPON_MODEL_BUILDERS) {
   const g = WEAPON_MODEL_BUILDERS[id]();
@@ -1439,21 +1444,18 @@ camera.add(muzzle);
 scene.add(camera);
 
 // ================= ACTIVE LOADOUT =================
-// The player's chosen 1-3 weapons for this match.
-let activeLoadout = ['m16', 'grenade'];    // fallback
-let currentWeapon = 0;                     // index into activeLoadout
-let grenadeCharges = 3;                    // current grenades in stock
-let grenadeRefillT = 0;                    // seconds until next grenade refills
+let activeLoadout = ['m16', 'grenade'];
+let currentWeapon = 0;
+let grenadeCharges = 3;
+let grenadeRefillT = 0;
 
 function getActiveWeaponId() { return activeLoadout[currentWeapon]; }
 function getActiveWeaponStats() { return WEAPON_STATS[getActiveWeaponId()]; }
-function getActiveWeaponInfo() { return WEAPON_INFO[getActiveWeaponId()]; }
 
 function setupLoadoutForMatch() {
   let lo = Account.currentLoadout.slice();
   if (lo.length === 0) lo = ['m16'];
   if (lo.length > 3) lo = lo.slice(0, 3);
-  // ensure the player actually owns everything in the list
   if (Account.user && Account.user.ownedWeapons) {
     const owned = Account.user.ownedWeapons;
     lo = lo.filter(function(id) { return owned.includes(id); });
@@ -1481,10 +1483,7 @@ function updateHotbarUI() {
     const el = document.getElementById('slot-' + i);
     if (!el) continue;
     const id = activeLoadout[i];
-    if (!id) {
-      el.style.display = 'none';
-      continue;
-    }
+    if (!id) { el.style.display = 'none'; continue; }
     el.style.display = 'flex';
     const info = WEAPON_INFO[id];
     const stats = WEAPON_STATS[id];
@@ -1500,7 +1499,7 @@ function updateHotbarUI() {
   }
 }
 
-// ================= GRENADES (thrown projectile) =================
+// ================= GRENADES =================
 const liveGrenades = [];
 const grenadeGeo = new THREE.SphereGeometry(0.18, 10, 8);
 const grenadeMat = new THREE.MeshLambertMaterial({ color: 0x3a5a2a });
@@ -1516,7 +1515,6 @@ function throwGrenade() {
   liveGrenades.push({ mesh: mesh, vel: vel, fuse: 2.0, beepT: 0 });
   Audio.grenadeThrow();
   grenadeCharges--;
-  // start refill timer if it wasn't running
   if (grenadeRefillT <= 0) grenadeRefillT = stats.refillTime || 12;
   updateHotbarUI();
   return true;
@@ -1792,7 +1790,6 @@ function buildSoldierRig(opts) {
 const MAX_ALIVE = 4, SPAWN_DELAY = 3.2;
 let spawnTimer = 0;
 
-// Coin reward per enemy
 const ENEMY_COIN_VALUE = { grunt: 5, rusher: 10, heavy: 25 };
 
 const ENEMY_TYPES = {
@@ -1801,8 +1798,7 @@ const ENEMY_TYPES = {
     fireCooldown: [2.6, 1.8], burst: [1, 0.3], range: 26, reaction: 0.4,
     inaccuracy: [2.4, 1.2], uniformTex: gruntCamo,
     helmetColor: 0x3a4a2a, gunColor: 0x1e2126, weaponStyle: 'rifle', scale: 1,
-    scoreValue: 10, sound: 'rifle',
-    tagText: 'GRUNT', teamColor: '#ff4444',
+    scoreValue: 10, sound: 'rifle', tagText: 'GRUNT', teamColor: '#ff4444',
   },
   rusher: {
     hp: 40, speed: 4.6, bulletDamage: 14, bulletSpeed: 26,
@@ -1950,7 +1946,6 @@ addEventListener('keydown', function(e) {
 addEventListener('keyup', function(e) { keys[e.code] = false; });
 let mouseDown = false, locked = false, rightDown = false;
 
-// MOBILE
 const mobile = { joyActive: false, joyX: 0, joyY: 0, lookActive: false, lookLastX: 0, lookLastY: 0, fireHeld: false, jumpQueued: false };
 function setupMobileControls() {
   const joyBase = document.getElementById('joyBase');
@@ -2008,7 +2003,7 @@ let score = 0, shakeT = 0, lastShot = 0;
 let footstepT = 0, wasOnGround = true;
 let killsThisGame = 0;
 let coinsEarnedThisGame = 0;
-let minigunSpin = 0;   // 0..1 spin-up progress
+let minigunSpin = 0;
 const clock = new THREE.Clock();
 const zoomVignette = document.getElementById('zoomVignette');
 let gameStarted = false;
@@ -2119,7 +2114,6 @@ function updateCoinHud() {
   document.getElementById('coinCount').textContent = coinsEarnedThisGame;
 }
 
-// ================= SUBMIT SCORE =================
 async function submitScore(finalScore, kills, coinsEarned) {
   if (!Account.token) return;
   try {
@@ -2137,7 +2131,6 @@ async function submitScore(finalScore, kills, coinsEarned) {
 
 // ================= START GAME =================
 function startGame() {
-  // read current loadout + owned weapons
   setupLoadoutForMatch();
   grenadeCharges = 3;
   grenadeRefillT = 0;
@@ -2220,14 +2213,12 @@ function startGame() {
     if (e.key === 'Enter') doLogin();
   });
 
-  // shop / loadout / leaderboard
   document.getElementById('shopBtn').addEventListener('click', openShop);
   document.getElementById('shopClose').addEventListener('click', function() {
     document.getElementById('shopModal').style.display = 'none';
   });
   document.getElementById('loadoutBtn').addEventListener('click', openLoadout);
   document.getElementById('loadoutClose').addEventListener('click', async function() {
-    // save loadout when closing
     try { await saveLoadout(); } catch (e) {}
     document.getElementById('loadoutModal').style.display = 'none';
   });
@@ -2290,7 +2281,7 @@ function loop() {
   const isMobile = CONFIG.platform === 'mobile';
   if (!weapon) { renderer.render(scene, camera); return; }
 
-  // grenade refill timer
+  // grenade refill
   if (grenadeCharges < (WEAPON_STATS.grenade.maxGrenades || 3)) {
     grenadeRefillT -= dt;
     if (grenadeRefillT <= 0) {
@@ -2303,7 +2294,6 @@ function loop() {
       updateHotbarUI();
     }
   }
-  // update grenade ammo count on hotbar in real time
   const grenadeSlotIndex = activeLoadout.indexOf('grenade');
   if (grenadeSlotIndex >= 0) {
     const el = document.getElementById('slot-' + grenadeSlotIndex);
@@ -2420,7 +2410,7 @@ function loop() {
     if (firing) minigunSpin = Math.min(1, minigunSpin + dt * 2.5);
     else minigunSpin = Math.max(0, minigunSpin - dt * 3);
     const barrels = weaponModels.minigun.userData.barrels;
-    if (barrels) barrels.rotation.z += dt * 20 * minigunSpin;
+    if (barrels) barrels.rotation.z += dt * 28 * minigunSpin;
   } else {
     minigunSpin = 0;
   }
@@ -2430,11 +2420,10 @@ function loop() {
   if (firing && lastShot >= weapon.fireRate) {
     if (weapon.isGrenade) {
       if (throwGrenade()) { lastShot = 0; shakeT = 3; }
-      else { lastShot = 0; } // empty click, but reset so it doesn't spam
+      else { lastShot = 0; }
     } else {
       const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
       let spread = weapon.spread;
-      // minigun only accurate when spinup complete and stationary
       if (weaponId === 'minigun') {
         const moving = move.lengthSq() > 0;
         spread = weapon.spread * (moving ? 2.2 : 1) * (1.6 - minigunSpin * 0.6);
@@ -2763,7 +2752,6 @@ function loop() {
 
   updateCorpses(dt);
 
-  // particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
