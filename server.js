@@ -3,7 +3,9 @@ process.on('uncaughtException', (e) => { console.error('CRASH:', e && e.stack ||
 process.on('unhandledRejection', (e) => { console.error('REJECT:', e && e.stack || e); });
 
 // ============================================================
-//  BLOCKY SHOOTER — server.js (Upstash Redis + Weapons Shop)
+//  BLOCKY SHOOTER — server.js
+//  Modes: Survival, Frontline, Extraction
+//  Storage: Upstash Redis
 // ============================================================
 
 const http = require('http');
@@ -18,7 +20,7 @@ const ADMIN_NAME = process.env.ADMIN_USER || 'Just_12yrs_old';
 
 const redis = Redis.fromEnv();
 
-// ---------- WEAPON CATALOG ----------
+// ---------- CATALOGS ----------
 const WEAPON_CATALOG = {
   m16:     { price: 0,    name: 'M16' },
   ak47:    { price: 800,  name: 'AK47' },
@@ -30,9 +32,15 @@ const WEAPON_CATALOG = {
   grenade: { price: 0,    name: 'Grenade' },
 };
 
-// Valid frontline packs (mirrors FRONTLINE_PACKS in the client)
 const VALID_PACKS = ['rifleman', 'breacher', 'scout', 'combat_medic', 'sharpshooter', 'phantom', 'juggernaut'];
 const ALL_PACKS_STRING = VALID_PACKS.join(',');
+
+// Armor catalog
+const ARMOR_CATALOG = {
+  none:  { name: 'None',        absorb: 0,   price: 0 },
+  light: { name: 'Light Armor', absorb: 50,  price: 0 },
+  heavy: { name: 'Heavy Armor', absorb: 120, price: 0 },
+};
 
 // ---------- auth ----------
 function hashPassword(password, salt) {
@@ -56,6 +64,13 @@ function makeUser(username, password) {
     ownedWeapons: isAdmin ? Object.keys(WEAPON_CATALOG).join(',') : 'm16,grenade',
     loadout: isAdmin ? 'ak47,awp,grenade' : 'm16,grenade',
     ownedPacks: isAdmin ? ALL_PACKS_STRING : 'rifleman',
+    // Extraction mode fields
+    stash: isAdmin ? Object.keys(WEAPON_CATALOG).join(',') : '',    // comma-separated weapon ids
+    safeBox: '',                                                      // comma-separated, max 2
+    equippedArmor: isAdmin ? 'heavy' : 'none',                        // none | light | heavy
+    ownedArmor: isAdmin ? 'light,heavy' : '',                         // armor ids you've extracted
+    extractionWins: isAdmin ? 100 : 0,
+    extractionLosses: 0,
     rank: 'Recruit',
     isBanned: 'false',
     isAdmin: isAdmin ? 'true' : 'false',
@@ -66,6 +81,9 @@ function publicUser(u) {
   const owned = (u.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
   const loadout = (u.loadout || 'm16,grenade').split(',').filter(Boolean);
   const ownedPacks = (u.ownedPacks || 'rifleman').split(',').filter(Boolean);
+  const stash = (u.stash || '').split(',').filter(Boolean);
+  const safeBox = (u.safeBox || '').split(',').filter(Boolean);
+  const ownedArmor = (u.ownedArmor || '').split(',').filter(Boolean);
   return {
     username: u.username,
     highScore: Number(u.highScore) || 0,
@@ -75,6 +93,12 @@ function publicUser(u) {
     ownedWeapons: owned,
     loadout: loadout,
     ownedPacks: ownedPacks,
+    stash: stash,
+    safeBox: safeBox,
+    equippedArmor: u.equippedArmor || 'none',
+    ownedArmor: ownedArmor,
+    extractionWins: Number(u.extractionWins) || 0,
+    extractionLosses: Number(u.extractionLosses) || 0,
     rank: u.rank || 'Recruit',
     last_save: u.lastSave ? Number(u.lastSave) : null,
     isAdmin: u.isAdmin === 'true' || u.isAdmin === true,
@@ -86,11 +110,17 @@ async function getUser(username) {
   if (!username) return null;
   const data = await redis.hgetall('user:' + username);
   if (!data || Object.keys(data).length === 0) return null;
-  // fill in missing fields for older accounts
+  // Fill in missing fields for older accounts
   if (data.coins === undefined) data.coins = '0';
   if (data.ownedWeapons === undefined) data.ownedWeapons = 'm16,grenade';
   if (data.loadout === undefined) data.loadout = 'm16,grenade';
   if (data.ownedPacks === undefined) data.ownedPacks = 'rifleman';
+  if (data.stash === undefined) data.stash = '';
+  if (data.safeBox === undefined) data.safeBox = '';
+  if (data.equippedArmor === undefined) data.equippedArmor = 'none';
+  if (data.ownedArmor === undefined) data.ownedArmor = '';
+  if (data.extractionWins === undefined) data.extractionWins = '0';
+  if (data.extractionLosses === undefined) data.extractionLosses = '0';
   return data;
 }
 async function saveUser(user) {
@@ -149,7 +179,7 @@ const routes = {
   },
 
   'GET /api/weapons': (req, res) => {
-    sendJSON(res, 200, { weapons: WEAPON_CATALOG });
+    sendJSON(res, 200, { weapons: WEAPON_CATALOG, armor: ARMOR_CATALOG });
   },
 
   'POST /api/register': async (req, res) => {
@@ -273,7 +303,7 @@ const routes = {
     sendJSON(res, 200, { success: true, loadout: unique });
   },
 
-  // ---- save coins (used for in-match coin updates) ----
+  // ---- save coins ----
   'POST /api/save-coins': async (req, res) => {
     const user = await authUser(req);
     if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
@@ -290,7 +320,7 @@ const routes = {
     sendJSON(res, 200, { success: true, coins: Number(user.coins) });
   },
 
-  // ---- save owned packs (permanent frontline pack ownership) ----
+  // ---- save owned packs ----
   'POST /api/save-packs': async (req, res) => {
     const user = await authUser(req);
     if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
@@ -306,7 +336,94 @@ const routes = {
     sendJSON(res, 200, { success: true, ownedPacks: filtered });
   },
 
-  // ---- submit score + award coins ----
+  // ---- save safe box (2 slots) ----
+  'POST /api/save-safe-box': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+
+    const body = await readBody(req);
+    const box = Array.isArray(body.safeBox) ? body.safeBox : [];
+    const filtered = box.slice(0, 2).filter(function(v) { return typeof v === 'string' && v.length > 0; });
+
+    user.safeBox = filtered.join(',');
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+    sendJSON(res, 200, { success: true, safeBox: filtered });
+  },
+
+  // ---- equip armor ----
+  'POST /api/equip-armor': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+
+    const body = await readBody(req);
+    const armorId = String(body.armor || 'none').toLowerCase();
+    if (!ARMOR_CATALOG[armorId]) return sendJSON(res, 400, { success: false, error: 'Unknown armor' });
+
+    const ownedArmor = (user.ownedArmor || '').split(',').filter(Boolean);
+    const isAdmin = user.isAdmin === 'true' || user.isAdmin === true;
+    if (armorId !== 'none' && !ownedArmor.includes(armorId) && !isAdmin) {
+      return sendJSON(res, 400, { success: false, error: 'You do not own this armor' });
+    }
+
+    user.equippedArmor = armorId;
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+    sendJSON(res, 200, { success: true, equippedArmor: armorId });
+  },
+
+  // ---- extraction result ----
+  // Client sends: { success: true/false, lootedWeapons: [...], lootedArmor: [...], coinsCollected: N }
+  // On success: looted items go to stash + ownedArmor, coins added.
+  // On death: looted items are lost (except items in safeBox — but safeBox holds weapons you configured BEFORE the match)
+  'POST /api/extraction-result': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+
+    const body = await readBody(req);
+    const success = body.success === true;
+    const lootedWeapons = Array.isArray(body.lootedWeapons) ? body.lootedWeapons : [];
+    const lootedArmor = Array.isArray(body.lootedArmor) ? body.lootedArmor : [];
+    const coinsCollected = Math.max(0, Math.min(50000, Number(body.coinsCollected) || 0));
+
+    user.lastSeen = String(Date.now());
+
+    if (success) {
+      // Add looted weapons to stash
+      const stash = (user.stash || '').split(',').filter(Boolean);
+      lootedWeapons.forEach(function(w) {
+        const id = String(w || '').toLowerCase();
+        if (WEAPON_CATALOG[id] && !stash.includes(id)) stash.push(id);
+      });
+      user.stash = stash.join(',');
+
+      // Add looted armor to owned armor
+      const ownedArmor = (user.ownedArmor || '').split(',').filter(Boolean);
+      lootedArmor.forEach(function(a) {
+        const id = String(a || '').toLowerCase();
+        if (ARMOR_CATALOG[id] && id !== 'none' && !ownedArmor.includes(id)) ownedArmor.push(id);
+      });
+      user.ownedArmor = ownedArmor.join(',');
+
+      // Add coins
+      user.coins = String((Number(user.coins) || 0) + coinsCollected);
+      user.extractionWins = String((Number(user.extractionWins) || 0) + 1);
+    } else {
+      // Death — lose looted items, keep whatever's in safeBox
+      user.extractionLosses = String((Number(user.extractionLosses) || 0) + 1);
+      // Still gain whatever coins were banked before dying (coins are safe)
+      user.coins = String((Number(user.coins) || 0) + Math.floor(coinsCollected * 0.5)); // half coins on death
+    }
+
+    await saveUser(user);
+    sendJSON(res, 200, {
+      success: true,
+      extracted: success,
+      user: publicUser(user),
+    });
+  },
+
+  // ---- submit score ----
   'POST /api/score': async (req, res) => {
     const user = await authUser(req);
     if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
@@ -341,7 +458,7 @@ const routes = {
     });
   },
 
-  // ---- leaderboard (returns both highScore and coins) ----
+  // ---- leaderboard ----
   'GET /api/leaderboard': async (req, res) => {
     const keys = await redis.keys('user:*');
     const users = [];
@@ -354,6 +471,7 @@ const routes = {
         totalKills: Number(data.totalKills) || 0,
         gamesPlayed: Number(data.gamesPlayed) || 0,
         coins: Number(data.coins) || 0,
+        extractionWins: Number(data.extractionWins) || 0,
         rank: data.rank || 'Recruit',
         is_admin: (data.isAdmin === 'true' || data.isAdmin === true) ? 1 : 0,
         last_save: data.lastSave ? Number(data.lastSave) : null,
@@ -441,29 +559,31 @@ server.listen(PORT, async function() {
     console.error('Admin setup failed:', e.message);
   }
 
-  // Top up admin on every boot (in case coins got spent)
+  // Top up admin on every boot
   try {
     const adm = await getUser(ADMIN_NAME);
     if (adm && (adm.isAdmin === 'true' || adm.isAdmin === true)) {
       let dirty = false;
-      if (Number(adm.coins) < 9999999) {
-        adm.coins = '9999999';
-        dirty = true;
-      }
-      if (Number(adm.highScore) < 999999) {
-        adm.highScore = '999999';
-        dirty = true;
-      }
-      // Make sure admin owns all packs
+      if (Number(adm.coins) < 9999999) { adm.coins = '9999999'; dirty = true; }
+      if (Number(adm.highScore) < 999999) { adm.highScore = '999999'; dirty = true; }
+
       const admPacks = (adm.ownedPacks || '').split(',').filter(Boolean);
-      if (admPacks.length < VALID_PACKS.length) {
-        adm.ownedPacks = ALL_PACKS_STRING;
-        dirty = true;
+      if (admPacks.length < VALID_PACKS.length) { adm.ownedPacks = ALL_PACKS_STRING; dirty = true; }
+
+      const admArmor = (adm.ownedArmor || '').split(',').filter(Boolean);
+      if (!admArmor.includes('light') || !admArmor.includes('heavy')) {
+        adm.ownedArmor = 'light,heavy'; dirty = true;
       }
+
+      const admStash = (adm.stash || '').split(',').filter(Boolean);
+      if (admStash.length < Object.keys(WEAPON_CATALOG).length) {
+        adm.stash = Object.keys(WEAPON_CATALOG).join(','); dirty = true;
+      }
+
       if (dirty) {
         adm.lastSeen = String(Date.now());
         await saveUser(adm);
-        console.log('Admin topped up: 9,999,999 coins + all packs 🪙');
+        console.log('Admin topped up: 9,999,999 coins + all packs + all armor + all weapons in stash 🪙');
       }
     }
   } catch (e) {
