@@ -729,8 +729,10 @@
   <div style="color:#ffd94a;font-size:13px;margin:20px 0 6px">STASHED WEAPONS:</div>
   <div id="stashGrid"></div>
   <div id="stashMsg"></div>
+  <div style="color:#4bea8b;font-size:13px;margin:20px 0 6px">SELL WEAPONS — click to sell for coins</div>
+  <div id="sellGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-width:720px;width:100%;"></div>
+
   <button class="closeBtn" id="stashClose">CLOSE</button>
-</div>
 
 <div id="leaderboardModal" class="modal">
   <h2>🏆 GLOBAL LEADERBOARD</h2>
@@ -886,6 +888,19 @@ const WEAPON_INFO = {
   awp:     { name: 'AWP',     price: 3500, icon: '🎯' },
   grenade: { name: 'Grenade', price: 0,    icon: '💣' },
 };
+// ================= SELL PRICES =================
+// What a weapon is worth when you sell it. Usually ~50% of buy price.
+const WEAPON_SELL_PRICE = {
+  m16:     0,      // starter weapon, worthless
+  ak47:    400,
+  m1916:   600,
+  mp5:     750,
+  scar:    1000,
+  minigun: 1500,
+  awp:     1750,
+  grenade: 0,
+};
+
 const WEAPON_STATS = {
   m16:     { fireRate: 0.10, auto: true,  damage: 12, spread: 0.012, bulletSpeed: 45,  moveSpeedMul: 1.0,  isGrenade: false },
   ak47:    { fireRate: 0.13, auto: true,  damage: 20, spread: 0.020, bulletSpeed: 44,  moveSpeedMul: 0.95, isGrenade: false },
@@ -1247,12 +1262,66 @@ function renderStash() {
     stashGrid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px">No stashed weapons yet. Extract loot from the Extraction mode to fill your stash.</div>';
     return;
   }
-  stash.forEach(function(id) {
+    stash.forEach(function(id) {
     const info = WEAPON_INFO[id]; if (!info) return;
     const card = document.createElement('div'); card.className = 'stashCard';
     card.innerHTML = '<div class="icon">' + info.icon + '</div><div class="wName">' + info.name + '</div>';
     stashGrid.appendChild(card);
   });
+
+  renderSellGrid();
+}
+
+function renderSellGrid() {
+  const grid = document.getElementById('sellGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const pool = [];
+  // Everything you own or have in stash is sellable
+  (Account.user.ownedWeapons || []).forEach(function(w) { if (!pool.includes(w)) pool.push(w); });
+  (Account.user.stash || []).forEach(function(w) { if (!pool.includes(w)) pool.push(w); });
+
+  if (pool.length === 0) {
+    grid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px">No weapons to sell.</div>';
+    return;
+  }
+
+  pool.forEach(function(id) {
+    const info = WEAPON_INFO[id]; if (!info) return;
+    const price = WEAPON_SELL_PRICE[id] || 0;
+    const card = document.createElement('div');
+    card.className = 'stashCard';
+    card.style.borderColor = price > 0 ? '#4bea8b' : '#666';
+    card.innerHTML =
+      '<div class="icon">' + info.icon + '</div>' +
+      '<div class="wName">' + info.name + '</div>' +
+      '<div style="font-size:11px;color:#ffd94a;margin-top:4px">🪙 ' + price + '</div>' +
+      '<div style="font-size:10px;color:#4bea8b;margin-top:2px">CLICK TO SELL</div>';
+    if (price <= 0) {
+      card.style.opacity = '0.4';
+      card.style.cursor = 'default';
+    } else {
+      card.addEventListener('click', function() { sellWeapon(id); });
+    }
+    grid.appendChild(card);
+  });
+}
+
+async function sellWeapon(id) {
+  const price = WEAPON_SELL_PRICE[id] || 0;
+  if (price <= 0) return;
+  if (!confirm('Sell ' + WEAPON_INFO[id].name + ' for 🪙 ' + price + '?')) return;
+  try {
+    const data = await apiCall('/api/sell-weapon', { weaponId: id });
+    if (data.user) {
+      Account.user = data.user;
+      showLoggedIn();
+      renderStash();
+      document.getElementById('stashMsg').textContent = '✓ Sold ' + WEAPON_INFO[id].name + ' for ' + price;
+    }
+  } catch (e) {
+    document.getElementById('stashMsg').textContent = 'Sell failed: ' + e.message;
+  }
 }
 function openSafeBoxPicker() {
   const list = document.getElementById('safeBoxPickList');
