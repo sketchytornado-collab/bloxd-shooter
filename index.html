@@ -70,6 +70,34 @@
                 color: #fff; letter-spacing: 2px; }
   #matchTimer.warning { color: #ff5555; }
 
+  /* ===== KILL FEED ===== */
+  #killFeed { position: fixed; top: calc(80px + env(safe-area-inset-top)); left: 50%;
+              transform: translateX(-50%); display: flex; flex-direction: column;
+              align-items: center; gap: 4px; pointer-events: none; z-index: 68;
+              max-width: 90vw; }
+  .killMsg { background: rgba(0,0,0,0.75); border-radius: 6px;
+             padding: 6px 14px; font: bold 13px monospace; color: #fff;
+             box-shadow: 0 2px 8px rgba(0,0,0,0.6); white-space: nowrap;
+             border-left: 4px solid #888;
+             animation: killMsgFade 0.15s ease-out; }
+  .killMsg.redKill { border-left-color: #ff4444; }
+  .killMsg.blueKill { border-left-color: #4488ff; }
+  .killMsg.youKilled { border-left-color: #4bea8b; background: rgba(30,80,50,0.85); }
+  .killMsg.youDied { border-left-color: #ff2222; background: rgba(80,20,20,0.85); }
+  .killMsg .killer { font-weight: bold; }
+  .killMsg .killer.red { color: #ff6666; }
+  .killMsg .killer.blue { color: #6699ff; }
+  .killMsg .killer.you { color: #4bea8b; }
+  .killMsg .victim { font-weight: bold; }
+  .killMsg .victim.red { color: #ff6666; }
+  .killMsg .victim.blue { color: #6699ff; }
+  .killMsg .victim.you { color: #4bea8b; }
+  .killMsg .verb { color: #aaa; margin: 0 6px; }
+  @keyframes killMsgFade {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   #captureIndicators { position: fixed; bottom: 130px; left: 50%; transform: translateX(-50%);
                        display: none; gap: 14px; pointer-events: none; z-index: 60;
                        bottom: calc(max(30px, env(safe-area-inset-bottom)) + 110px); }
@@ -129,6 +157,7 @@
   .packCard .buyPackBtn { background: #aa66ff; border: 2px solid #cc99ff; color: #fff; }
   .packCard .buyPackBtn:disabled { background: #444; border-color: #666; color: #999; }
   .packCard .equippedTag { color: #4bea8b; font-weight: bold; padding: 8px; }
+  .packCard .ownedTag { color: #ffd94a; font-weight: bold; padding: 4px; font-size: 11px; margin-bottom: 6px; }
 
   #respawnOverlay { position: fixed; inset: 0; z-index: 150; display: none;
                     flex-direction: column; align-items: center; justify-content: center;
@@ -346,7 +375,7 @@
   .lb-row.me { border-left-color: #4bea8b; background: rgba(75,234,139,0.15); }
   .lb-rank { color: #8af; width: 40px; text-align: left; font-weight: bold; }
   .lb-name { flex: 1; text-align: left; color: #fff; }
-  .lb-score { color: #4bea8b; font-weight: bold; }
+  .lb-score { color: #ffd94a; font-weight: bold; }
 
   #mobileControls { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 50; }
   #mobileControls.active { display: block; }
@@ -546,6 +575,8 @@
   <div id="matchTimer">3:00</div>
 </div>
 
+<div id="killFeed"></div>
+
 <div id="captureIndicators">
   <div class="capInd" id="cap-A"><span class="letter">A</span><span class="status">NEUTRAL</span><div class="progressBar"></div></div>
   <div class="capInd" id="cap-B"><span class="letter">B</span><span class="status">NEUTRAL</span><div class="progressBar"></div></div>
@@ -646,8 +677,14 @@ const Account = {
     try { const s = localStorage.getItem('bs_loadout'); if (s) return JSON.parse(s); } catch (e) {}
     return ['m16', 'grenade'];
   })(),
+  // Packs the player has bought — stored locally + synced to server
+  ownedPacks: (function() {
+    try { const s = localStorage.getItem('bs_ownedPacks'); if (s) return JSON.parse(s); } catch (e) {}
+    return ['rifleman'];
+  })(),
 };
 if (!Account.currentLoadout || Account.currentLoadout.length === 0) Account.currentLoadout = ['m16', 'grenade'];
+if (!Account.ownedPacks || Account.ownedPacks.length === 0) Account.ownedPacks = ['rifleman'];
 
 function authHeaders() { return Account.token ? { 'Authorization': 'Bearer ' + Account.token } : {}; }
 async function apiCall(path, body) {
@@ -666,6 +703,17 @@ function showLoggedIn() {
   document.getElementById('loggedInHigh').textContent = Account.user.highScore || 0;
   document.getElementById('loggedInCoins').textContent = Account.user.coins || 0;
   document.getElementById('loggedInGames').textContent = Account.user.gamesPlayed || 0;
+  // Sync owned packs from server if available
+  if (Account.user.ownedPacks && Array.isArray(Account.user.ownedPacks)) {
+    Account.ownedPacks = Account.user.ownedPacks.slice();
+    if (!Account.ownedPacks.includes('rifleman')) Account.ownedPacks.push('rifleman');
+    localStorage.setItem('bs_ownedPacks', JSON.stringify(Account.ownedPacks));
+  }
+  // If admin, give them all packs
+  if (Account.user.isAdmin) {
+    Account.ownedPacks = Object.keys(FRONTLINE_PACKS);
+    localStorage.setItem('bs_ownedPacks', JSON.stringify(Account.ownedPacks));
+  }
 }
 function showLoggedOut() { document.getElementById('accountPanel').style.display = 'block'; document.getElementById('loggedInBox').style.display = 'none'; }
 async function doLogin() {
@@ -821,7 +869,7 @@ async function saveLoadout() {
   }
 }
 
-// ================= LEADERBOARD =================
+// ================= LEADERBOARD (sorted by coins now) =================
 async function showLeaderboard() {
   const modal = document.getElementById('leaderboardModal');
   const list = document.getElementById('leaderboardList');
@@ -830,6 +878,8 @@ async function showLeaderboard() {
     const data = await apiCall('/api/leaderboard');
     const board = data.leaderboard || [];
     if (board.length === 0) { list.innerHTML = '<div style="padding:20px;color:#888">No scores yet — be the first!</div>'; return; }
+    // Sort by coins (money) — server already does but double-check
+    board.sort(function(a, b) { return (b.coins || 0) - (a.coins || 0); });
     list.innerHTML = '';
     board.forEach(function(row, i) {
       const div = document.createElement('div'); div.className = 'lb-row';
@@ -838,7 +888,7 @@ async function showLeaderboard() {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
       div.innerHTML = '<span class="lb-rank">' + medal + '</span>' +
         '<span class="lb-name">' + escapeHtml(row.username) + '</span>' +
-        '<span class="lb-score">' + (row.highScore || 0) + '</span>';
+        '<span class="lb-score">🪙 ' + (row.coins || 0) + '</span>';
       list.appendChild(div);
     });
   } catch (e) {
@@ -917,6 +967,13 @@ const Audio = (function() {
   function matchLose() { tone({ type: 'sawtooth', freq: 400, freqEnd: 100, dur: 0.8, vol: 0.4, distortion: 6 }); }
   function respawnBeep() { tone({ type: 'square', freq: 800, dur: 0.08, vol: 0.2 }); }
   function emptyClick() { tone({ type: 'square', freq: 700, freqEnd: 400, dur: 0.04, vol: 0.1 }); }
+  function killChime() {
+    tone({ type: 'sine', freq: 880, freqEnd: 1320, dur: 0.12, vol: 0.15 });
+    tone({ type: 'sine', freq: 1320, freqEnd: 1760, dur: 0.15, vol: 0.1, decay: 0.12 });
+  }
+  function deathChime() {
+    tone({ type: 'sawtooth', freq: 200, freqEnd: 80, dur: 0.3, vol: 0.25, distortion: 5 });
+  }
   function startAmbient() {
     if (!ctx || ambientStarted) return; ambientStarted = true;
     const bs = 2 * ctx.sampleRate; const buffer = ctx.createBuffer(1, bs, ctx.sampleRate);
@@ -937,6 +994,7 @@ const Audio = (function() {
     weaponSwitch: weaponSwitch, enemyShot: enemyShot,
     captureComplete: captureComplete, matchWin: matchWin, matchLose: matchLose,
     respawnBeep: respawnBeep, emptyClick: emptyClick,
+    killChime: killChime, deathChime: deathChime,
   };
 })();
 
@@ -1080,33 +1138,55 @@ const MAPS = {
       fillRect(41, 22, 45, 24, 11);
       set(42, 25, 6); set(43, 25, 6); set(44, 25, 6);
 
-      // POINT A building
-      box(10, 21, 18, 29, 1);
-      set(18, 24, 0); set(18, 25, 0);
-      set(10, 24, 0); set(10, 25, 0);
-      for (let z = 22; z <= 28; z++) set(14, z, 1);
+      // POINT A — Military Bunker
+      box(9, 20, 19, 30, 1);
+      set(19, 24, 0); set(19, 25, 0); set(19, 26, 0);
+      set(9, 24, 0); set(9, 25, 0);
+      for (let z = 21; z <= 29; z++) set(14, z, 1);
       set(14, 24, 0); set(14, 25, 0);
-      fillRect(15, 22, 17, 24, 11);
-      set(15, 25, 6); set(16, 25, 6); set(17, 25, 6);
-      set(12, 23, 2); set(12, 27, 2); set(11, 25, 2);
+      fillRect(15, 21, 18, 23, 11);
+      set(15, 24, 6); set(16, 24, 6); set(17, 24, 6); set(18, 24, 6);
+      set(11, 22, 3); set(11, 28, 3); set(12, 25, 2);
+      set(16, 27, 2); set(17, 28, 3);
+      set(10, 26, 2);
 
-      // POINT C building
-      box(31, 21, 39, 29, 1);
-      set(31, 24, 0); set(31, 25, 0);
-      set(39, 24, 0); set(39, 25, 0);
-      for (let z = 22; z <= 28; z++) set(35, z, 1);
+      // POINT C — Military Bunker
+      box(30, 20, 40, 30, 1);
+      set(30, 24, 0); set(30, 25, 0); set(30, 26, 0);
+      set(40, 24, 0); set(40, 25, 0);
+      for (let z = 21; z <= 29; z++) set(35, z, 1);
       set(35, 24, 0); set(35, 25, 0);
-      fillRect(32, 22, 34, 24, 11);
-      set(32, 25, 6); set(33, 25, 6); set(34, 25, 6);
-      set(37, 23, 2); set(37, 27, 2); set(38, 25, 2);
+      fillRect(31, 21, 34, 23, 11);
+      set(31, 24, 6); set(32, 24, 6); set(33, 24, 6); set(34, 24, 6);
+      set(38, 22, 3); set(38, 28, 3); set(37, 25, 2);
+      set(32, 27, 2); set(33, 28, 3);
+      set(39, 26, 2);
 
-      // POINT B central fortress
-      for (let x = 22; x <= 28; x++) { if (x !== 24 && x !== 25 && x !== 26) { set(x, 22, 3); set(x, 28, 3); } }
-      for (let z = 22; z <= 28; z++) { if (z !== 24 && z !== 25 && z !== 26) { set(22, z, 3); set(28, z, 3); } }
-      box(23, 23, 27, 27, 1);
-      set(25, 23, 0); set(25, 27, 0); set(23, 25, 0); set(27, 25, 0);
-      fillRect(24, 24, 26, 26, 11);
-      set(25, 26, 6); set(23, 25, 6); set(27, 25, 6); set(25, 24, 7);
+      // POINT B — Central Command Bunker
+      for (let x = 21; x <= 29; x++) { if (x !== 24 && x !== 25 && x !== 26) { set(x, 21, 3); set(x, 29, 3); } }
+      for (let z = 21; z <= 29; z++) { if (z !== 24 && z !== 25 && z !== 26) { set(21, z, 3); set(29, z, 3); } }
+      box(22, 22, 28, 28, 1);
+      set(25, 22, 0);
+      set(25, 28, 0);
+      set(22, 25, 0);
+      set(28, 25, 0);
+      fillRect(23, 23, 27, 27, 11);
+      set(25, 27, 6);
+      set(23, 25, 6);
+      set(27, 25, 6);
+      set(25, 23, 7);
+      set(22, 22, 1); set(22, 28, 1); set(28, 22, 1); set(28, 28, 1);
+
+      // Watchtowers
+      box(15, 22, 17, 24, 1);
+      set(16, 24, 0);
+      set(15, 25, 6); set(16, 25, 6); set(17, 25, 6);
+      set(16, 23, 11);
+
+      box(32, 22, 34, 24, 1);
+      set(33, 24, 0);
+      set(32, 25, 6); set(33, 25, 6); set(34, 25, 6);
+      set(33, 23, 11);
 
       // Towers
       box(17, 8, 23, 12, 1);
@@ -1208,7 +1288,6 @@ let MAP, MAP_W, MAP_H;
 const TILE = 3;
 let wallTex, wallTopTex, floorTex, crateTex, barrierTex;
 let currentMapDef = null;
-
 const STAIR_TYPES = { 4:1, 5:1, 6:1, 7:1 };
 
 function buildMapTextures(def) {
@@ -1458,6 +1537,7 @@ const player = {
   eyeHeight: 1.7, radius: 0.5, hp: 100, yaw: 0, pitch: 0,
   vy: 0, onGround: true,
   team: 'red',
+  name: 'YOU',
 };
 const GRAVITY = 30, JUMP_VELOCITY = 11;
 
@@ -1696,7 +1776,6 @@ function explode(pos, team) {
   const flash = new THREE.PointLight(0xffaa33, 20, 18);
   flash.position.copy(pos); scene.add(flash);
   setTimeout(function() { scene.remove(flash); }, 120);
-  // Damage survival enemies (no team)
   enemies.forEach(function(e) {
     if (e.dead) return;
     const d = e.group.position.distanceTo(pos);
@@ -1706,7 +1785,6 @@ function explode(pos, team) {
       if (e.hp <= 0) killEnemy(e, pos.clone().sub(e.group.position).normalize());
     }
   });
-  // Damage frontline AI
   allSoldiers().forEach(function(s) {
     if (s === player) return;
     if (s.dead || s.team === team) return;
@@ -1716,7 +1794,6 @@ function explode(pos, team) {
       if (s.hp <= 0) killAISoldier(s);
     }
   });
-  // Damage ally
   if (ally && !ally.dead && team !== 'red') {
     const ad = ally.group.position.distanceTo(pos);
     if (ad < 5) { ally.hp -= 100 * (1 - ad/5); if (ally.hp <= 0) killAlly(ally); }
@@ -1727,10 +1804,37 @@ function explode(pos, team) {
       player.hp -= 30 * (1 - dp/5);
       shakeT = 20; Audio.playerHurt();
       if (player.hp <= 0) {
-        if (Frontline.active) playerDie();
+        if (Frontline.active) playerDie('grenade');
         else running = false;
       }
     }
+  }
+}
+
+// ================= KILL FEED =================
+const killFeed = [];
+function addKillMessage(killerName, killerTeam, victimName, victimTeam, isYou, isVictimYou) {
+  const feed = document.getElementById('killFeed');
+  const msg = document.createElement('div');
+  msg.className = 'killMsg';
+  if (isYou) msg.classList.add('youKilled');
+  else if (isVictimYou) msg.classList.add('youDied');
+  else if (killerTeam === 'red' || victimTeam === 'red') msg.classList.add('redKill');
+  else if (killerTeam === 'blue' || victimTeam === 'blue') msg.classList.add('blueKill');
+  const killerClass = isYou ? 'you' : (killerTeam === 'red' ? 'red' : killerTeam === 'blue' ? 'blue' : '');
+  const victimClass = isVictimYou ? 'you' : (victimTeam === 'red' ? 'red' : victimTeam === 'blue' ? 'blue' : '');
+  msg.innerHTML =
+    '<span class="killer ' + killerClass + '">' + escapeHtml(killerName) + '</span>' +
+    '<span class="verb">🔫 killed</span>' +
+    '<span class="victim ' + victimClass + '">' + escapeHtml(victimName) + '</span>';
+  feed.appendChild(msg);
+  // Remove after 5 seconds
+  setTimeout(function() {
+    if (msg.parentNode) msg.parentNode.removeChild(msg);
+  }, 5000);
+  // Cap at 5 messages
+  while (feed.children.length > 5) {
+    feed.removeChild(feed.firstChild);
   }
 }
 
@@ -1813,7 +1917,13 @@ function buildSoldierRig(opts) {
   return { group: g, rig: rig, legL: legL, legR: legR, armLPivot: armLPivot, armRPivot: armRPivot, weapon: weapon, flashMats: flashMats, muzzleOffset: muzzleOffset, nametag: nametag, healthBar: healthBar };
 }
 
-// ================= AI SOLDIER (FRONTLINE) =================
+// ================= AI SOLDIER =================
+function randomAIName(team) {
+  const names = team === 'red'
+    ? ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf']
+    : ['Victor', 'Tango', 'Sierra', 'Romeo', 'Quebec', 'Papa', 'November'];
+  return names[Math.floor(Math.random() * names.length)] + Math.floor(Math.random() * 100);
+}
 function createAISoldier(team) {
   const def = {
     uniformTex: team === 'red' ? redTeamTex : blueTeamTex,
@@ -1827,6 +1937,7 @@ function createAISoldier(team) {
   scene.add(rig.group);
   return Object.assign({}, rig, {
     type: 'ai', team: team,
+    name: randomAIName(team),
     hp: 100, maxHp: 100, speed: 4.0,
     fireCd: 0.8 + Math.random(),
     walkPhase: Math.random() * 10, hurtT: 0, hitShake: 0,
@@ -1899,7 +2010,7 @@ function sparkBurst(pos, count) {
   setTimeout(function() { scene.remove(fl); }, 60);
 }
 
-// ================= CORPSES (SURVIVAL) =================
+// ================= CORPSES =================
 const CORPSE_LIFETIME = 10;
 const CORPSE_FADE_TIME = 2;
 const MAX_CORPSES = 10;
@@ -2093,8 +2204,7 @@ function updateAlly(dt) {
       if (e.dead) continue;
       const d = a.group.position.distanceTo(e.group.position);
       if (d > bestD) continue;
-      if (!hasLineOfSight(a.group.position.x, a.y + 1.4, a.group.position.z,
-                          e.group.position.x, e.y + 1.2, e.group.position.z)) continue;
+      if (!hasLineOfSight(a.group.position.x, a.y + 1.4, a.group.position.z, e.group.position.x, e.y + 1.2, e.group.position.z)) continue;
       best = e; bestD = d;
     }
     a.targetEnemy = best;
@@ -2104,12 +2214,10 @@ function updateAlly(dt) {
   if (a.targetEnemy && !a.targetEnemy.dead) {
     const e = a.targetEnemy;
     const toE = new THREE.Vector3(e.group.position.x - a.group.position.x, 0, e.group.position.z - a.group.position.z);
-    const dE = toE.length();
-    toE.normalize();
+    const dE = toE.length(); toE.normalize();
     if (dE > 12) moveDir.copy(toE);
     else if (dE < 5) moveDir.copy(toE).multiplyScalar(-1);
-    engaged = true;
-    a.status = 'ENGAGED';
+    engaged = true; a.status = 'ENGAGED';
   } else {
     a.status = 'ROAMING';
     const toDest = new THREE.Vector3(a.dest.x - a.group.position.x, 0, a.dest.z - a.group.position.z);
@@ -2152,13 +2260,10 @@ function updateAlly(dt) {
   if (a.targetEnemy && !a.targetEnemy.dead && a.fireCd <= 0) {
     const e = a.targetEnemy;
     const muzzlePos = a.muzzleOffset.clone().applyMatrix4(a.group.matrixWorld);
-    if (hasLineOfSight(muzzlePos.x, muzzlePos.y, muzzlePos.z,
-                       e.group.position.x, e.y + 1.2, e.group.position.z)) {
+    if (hasLineOfSight(muzzlePos.x, muzzlePos.y, muzzlePos.z, e.group.position.x, e.y + 1.2, e.group.position.z)) {
       const tgt = e.group.position.clone().add(new THREE.Vector3(0, 1.2 * (e.def ? e.def.scale : 1), 0));
       const dir = tgt.sub(muzzlePos).normalize();
-      dir.x += (Math.random()-0.5) * 0.5;
-      dir.y += (Math.random()-0.5) * 0.2;
-      dir.z += (Math.random()-0.5) * 0.5;
+      dir.x += (Math.random()-0.5) * 0.5; dir.y += (Math.random()-0.5) * 0.2; dir.z += (Math.random()-0.5) * 0.5;
       dir.normalize();
       spawnBullet(muzzlePos, dir, 'player', false, 10, 40, false, 'red');
       Audio.gunshot(0.2);
@@ -2172,7 +2277,7 @@ function updateAlly(dt) {
   if (a.healthBar) redrawHealthBar(a.healthBar, a.hp / a.maxHp);
 }
 
-// ================= SURVIVAL ENEMY (uses same body but different AI) =================
+// ================= SURVIVAL ENEMY =================
 const MAX_ALIVE = 4, SPAWN_DELAY = 3.2;
 let spawnTimer = 0;
 const uniformTex = makeCamo('#4a5a38', ['#2f3a22', '#6b7a4a', '#3b4a2a', '#55663c']);
@@ -2228,6 +2333,7 @@ function killEnemy(e, impulseDir) {
   scene.remove(e.group);
   const chEl = document.getElementById('coinCount');
   if (chEl) chEl.textContent = score;
+  Audio.killChime();
 }
 function updateSurvivalEnemies(dt) {
   for (const e of enemies) {
@@ -2316,9 +2422,7 @@ function updateSurvivalEnemies(dt) {
     else e.reactionT = def.reaction + Math.random() * 0.2;
     if (inRange && e.reactionT <= 0 && e.fireCd <= 0) {
       const shots = def.burst[0] + (Math.random() < def.burst[1] ? 1 : 0);
-      if (def.sound === 'heavy') Audio.enemyShot();
-      else if (def.sound === 'shotgun') Audio.enemyShot();
-      else Audio.enemyShot();
+      Audio.enemyShot();
       const pitchSpread = def.inaccuracy[0];
       const ySpread = def.inaccuracy[1];
       const capturedIsPlayer = target.isPlayer;
@@ -2492,13 +2596,15 @@ function drawMinimap() {
 }
 
 // ================= FRONTLINE KILL / RESPAWN =================
-function killAISoldier(s) {
+function killAISoldier(s, killerName, killerTeam) {
   if (s.dead) return;
   s.dead = true;
   bloodBurst(s.group.position.clone().add(new THREE.Vector3(0,1.2,0)), 22);
   burst(s.group.position.clone().add(new THREE.Vector3(0,1.2,0)), 0xff2222, 12);
   Audio.enemyDeath();
   scene.remove(s.group);
+  // Kill feed
+  addKillMessage(killerName || 'WORLD', killerTeam, s.name, s.team, killerName === player.name, false);
   setTimeout(function() { respawnAISoldier(s); }, 6000);
 }
 function respawnAISoldier(s) {
@@ -2524,13 +2630,14 @@ function respawnAISoldier(s) {
   s.target = null; s.status = 'ADVANCING';
   s.lastPos = s.group.position.clone();
 }
-function playerDie() {
+function playerDie(cause) {
   if (Frontline.dead) return;
   Frontline.dead = true;
   Frontline.respawnTimer = 5;
   player.hp = 0;
   document.getElementById('respawnOverlay').classList.add('active');
   document.getElementById('respawnTimer').textContent = '5';
+  Audio.deathChime();
   if (CONFIG.platform === 'pc') document.exitPointerLock();
 }
 function respawnPlayer() {
@@ -2547,7 +2654,7 @@ function respawnPlayer() {
   if (CONFIG.platform === 'pc') renderer.domElement.requestPointerLock();
 }
 
-// ================= FRONTLINE PACKS =================
+// ================= FRONTLINE PACKS (PERMANENT) =================
 function applyFrontlinePack(packId) {
   const pack = FRONTLINE_PACKS[packId]; if (!pack) return;
   activeLoadout = pack.weapons.slice();
@@ -2560,36 +2667,59 @@ function applyFrontlinePack(packId) {
 function openPackShop() {
   if (!Frontline.active) return;
   document.getElementById('packModal').classList.add('active');
-  document.getElementById('packCoins').textContent = 'COINS: ' + Frontline.coinsEarnedThisMatch;
+  // Show total coins from account (not match-only)
+  const coins = Account.user ? (Account.user.coins || 0) : 0;
+  document.getElementById('packCoins').textContent = 'YOUR COINS: ' + coins;
   renderPackShop();
 }
 function renderPackShop() {
   const grid = document.getElementById('packGrid'); grid.innerHTML = '';
+  const isAdmin = Account.user && Account.user.isAdmin;
+  const coins = Account.user ? (Account.user.coins || 0) : 0;
   Object.keys(FRONTLINE_PACKS).forEach(function(id) {
     const pack = FRONTLINE_PACKS[id];
     const card = document.createElement('div');
     card.className = 'packCard rarity-' + pack.rarity;
-    const canAfford = Frontline.coinsEarnedThisMatch >= pack.price;
+    // Permanent ownership
+    const alreadyOwned = isAdmin || Account.ownedPacks.includes(id);
     const equipped = Frontline.playerPackId === id;
+    const canAfford = isAdmin || coins >= pack.price;
     const weaponNames = pack.weapons.map(function(w) { return WEAPON_INFO[w].name; }).join(' + ');
     card.innerHTML = '<div class="rarity">' + pack.rarity.toUpperCase() + '</div>' +
       '<div class="packName">' + pack.name + '</div>' +
       '<div class="packWeapons">' + weaponNames + '</div>' +
       '<div class="packPrice">🪙 ' + pack.price + '</div>';
+    if (alreadyOwned) card.innerHTML += '<div class="ownedTag">✓ OWNED (PERMANENT)</div>';
     if (equipped) card.innerHTML += '<div class="equippedTag">✓ EQUIPPED</div>';
     else {
       const btn = document.createElement('button');
       btn.className = 'buyPackBtn';
-      btn.textContent = canAfford ? 'EQUIP PACK' : 'NOT ENOUGH';
-      btn.disabled = !canAfford;
+      if (alreadyOwned) btn.textContent = 'EQUIP';
+      else btn.textContent = canAfford ? ('BUY — 🪙' + pack.price) : ('NOT ENOUGH — 🪙' + pack.price);
+      btn.disabled = !canAfford && !alreadyOwned;
       btn.addEventListener('click', function() {
-        if (Frontline.coinsEarnedThisMatch < pack.price) return;
-        Frontline.coinsEarnedThisMatch -= pack.price;
+        if (alreadyOwned) {
+          // Just equip
+          Frontline.playerPackId = id;
+          applyFrontlinePack(id);
+          renderPackShop();
+          return;
+        }
+        if (!canAfford) return;
+        // Deduct coins and unlock permanently
+        if (Account.user && !isAdmin) {
+          Account.user.coins = (Account.user.coins || 0) - pack.price;
+          document.getElementById('loggedInCoins').textContent = Account.user.coins;
+          // Save coins to server
+          apiCall('/api/save-coins', { coins: Account.user.coins }).catch(function(e) { console.warn('coin save failed', e.message); });
+        }
+        Account.ownedPacks.push(id);
+        localStorage.setItem('bs_ownedPacks', JSON.stringify(Account.ownedPacks));
         Frontline.playerPackId = id;
         applyFrontlinePack(id);
-        document.getElementById('packCoins').textContent = 'COINS: ' + Frontline.coinsEarnedThisMatch;
-        document.getElementById('coinCount').textContent = Frontline.coinsEarnedThisMatch;
+        document.getElementById('packCoins').textContent = 'YOUR COINS: ' + (Account.user ? Account.user.coins : 0);
         renderPackShop();
+        alert('Purchased ' + pack.name + '! You can equip it any match from now on.');
       });
       card.appendChild(btn);
     }
@@ -2627,7 +2757,13 @@ function updateCapturePoints(dt) {
         if (cp.owner !== 'red') {
           cp.owner = 'red';
           Audio.captureComplete();
-          if (player.team === 'red') { Frontline.coinsEarnedThisMatch += 50; document.getElementById('coinCount').textContent = Frontline.coinsEarnedThisMatch; }
+          if (player.team === 'red' && Account.user) {
+            Account.user.coins = (Account.user.coins || 0) + 50;
+            document.getElementById('loggedInCoins').textContent = Account.user.coins;
+            apiCall('/api/save-coins', { coins: Account.user.coins }).catch(function(){});
+            Frontline.coinsEarnedThisMatch += 50;
+            document.getElementById('coinCount').textContent = Frontline.coinsEarnedThisMatch;
+          }
         }
         cp.progress = 1; cp.progressTeam = 'red';
       }
@@ -2638,7 +2774,13 @@ function updateCapturePoints(dt) {
         if (cp.owner !== 'blue') {
           cp.owner = 'blue';
           Audio.captureComplete();
-          if (player.team === 'blue') { Frontline.coinsEarnedThisMatch += 50; document.getElementById('coinCount').textContent = Frontline.coinsEarnedThisMatch; }
+          if (player.team === 'blue' && Account.user) {
+            Account.user.coins = (Account.user.coins || 0) + 50;
+            document.getElementById('loggedInCoins').textContent = Account.user.coins;
+            apiCall('/api/save-coins', { coins: Account.user.coins }).catch(function(){});
+            Frontline.coinsEarnedThisMatch += 50;
+            document.getElementById('coinCount').textContent = Frontline.coinsEarnedThisMatch;
+          }
         }
         cp.progress = 1; cp.progressTeam = 'blue';
       }
@@ -2794,6 +2936,7 @@ function startFrontline() {
   Frontline.dead = false;
   Frontline.respawnTimer = 0;
   player.team = Math.random() < 0.5 ? 'red' : 'blue';
+  player.name = Account.user ? Account.user.username : 'YOU';
   Frontline.redPlayers.forEach(function(s) { if (!s.dead) scene.remove(s.group); });
   Frontline.bluePlayers.forEach(function(s) { if (!s.dead) scene.remove(s.group); });
   Frontline.redPlayers = [];
@@ -2803,12 +2946,17 @@ function startFrontline() {
   const spawn = player.team === 'red' ? currentMapDef.redSpawn : currentMapDef.blueSpawn;
   player.pos.set(spawn.x * TILE, 0, spawn.z * TILE);
   player.hp = 100; player.yaw = player.team === 'red' ? Math.PI/2 : -Math.PI/2; player.pitch = 0;
+  // Use first owned pack as default, fallback rifleman
+  let defaultPack = 'rifleman';
+  if (Account.ownedPacks.length > 0) defaultPack = Account.ownedPacks[Account.ownedPacks.length - 1];
+  Frontline.playerPackId = defaultPack;
   applyFrontlinePack(Frontline.playerPackId);
   document.getElementById('frontlineHud').classList.add('active');
   document.getElementById('captureIndicators').classList.add('active');
   document.getElementById('packShopBtn').classList.add('active');
   document.getElementById('allies').style.display = 'none';
   document.getElementById('coinCount').textContent = '0';
+  document.getElementById('killFeed').innerHTML = '';
   document.getElementById('home').style.display = 'none';
   gameStarted = true;
   running = true;
@@ -2825,6 +2973,7 @@ function startSurvival() {
   document.getElementById('allies').style.display = 'block';
   document.getElementById('respawnOverlay').classList.remove('active');
   document.getElementById('matchEnd').classList.remove('active');
+  document.getElementById('killFeed').innerHTML = '';
 
   setupLoadoutForMatch();
   grenadeCharges = 3; grenadeRefillT = 0;
@@ -2858,7 +3007,7 @@ function startSurvival() {
   else renderer.domElement.requestPointerLock();
 }
 
-// ================= START GAME (router) =================
+// ================= START GAME =================
 function startGame() {
   if (CONFIG.mode === 'frontline') startFrontline();
   else startSurvival();
@@ -3144,7 +3293,7 @@ function loop() {
   }
   muzzle.intensity = Math.max(0, muzzle.intensity - dt * 30);
 
-  // ---- player bullets ----
+  // player bullets
   for (const b of bullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -3156,7 +3305,6 @@ function loop() {
       if (b.life > 0) { burst(b.mesh.position, 0xbbbbbb, 4); Audio.wallHit(); }
       b.life = 0; continue;
     }
-    // frontline AI enemies
     if (Frontline.active) {
       for (const e of enemiesOf(player.team)) {
         if (e.dead) continue;
@@ -3169,16 +3317,22 @@ function loop() {
           Audio.enemyHit();
           if (e.healthBar) redrawHealthBar(e.healthBar, e.hp / e.maxHp);
           if (e.hp <= 0) {
-            killAISoldier(e);
+            killAISoldier(e, player.name, player.team);
             Frontline.playerKillsThisMatch++;
+            // Give coins to player account
+            if (Account.user) {
+              Account.user.coins = (Account.user.coins || 0) + 10;
+              document.getElementById('loggedInCoins').textContent = Account.user.coins;
+              apiCall('/api/save-coins', { coins: Account.user.coins }).catch(function(){});
+            }
             Frontline.coinsEarnedThisMatch += 10;
             document.getElementById('coinCount').textContent = Frontline.coinsEarnedThisMatch;
+            Audio.killChime();
           }
           b.life = 0; break;
         }
       }
     } else {
-      // survival enemies
       for (const e of enemies) {
         if (e.dead) continue;
         const center = e.group.position.clone().add(new THREE.Vector3(0, 1.2 * (e.def ? e.def.scale : 1), 0));
@@ -3189,7 +3343,7 @@ function loop() {
       }
     }
   }
-  // ---- AI bullets ----
+  // AI bullets
   for (const b of aiBullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -3201,7 +3355,7 @@ function loop() {
         player.hp -= b.damage || 8;
         bloodBurst(b.mesh.position, 4); Audio.playerHurt();
         shakeT = 6; b.life = 0;
-        if (player.hp <= 0) playerDie();
+        if (player.hp <= 0) playerDie('shot');
         continue;
       }
     }
@@ -3213,12 +3367,16 @@ function loop() {
         e.hurtT = 0.1;
         bloodBurst(b.mesh.position, 3);
         if (e.healthBar) redrawHealthBar(e.healthBar, e.hp / e.maxHp);
-        if (e.hp <= 0) killAISoldier(e);
+        if (e.hp <= 0) {
+          // Find killer name from bullet team
+          const killerName = b.team === player.team ? 'UNKNOWN' : null;
+          killAISoldier(e, killerName || (b.team === 'red' ? 'RED' : 'BLUE'), b.team);
+        }
         b.life = 0; break;
       }
     }
   }
-  // ---- survival enemy bullets ----
+  // survival enemy bullets
   for (const b of eBullets) {
     b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
     b.life -= dt;
@@ -3241,7 +3399,7 @@ function loop() {
       }
     }
   }
-  // ---- grenades ----
+  // grenades
   for (let i = liveGrenades.length - 1; i >= 0; i--) {
     const gr = liveGrenades[i];
     gr.mesh.position.add(gr.vel.clone().multiplyScalar(dt));
@@ -3261,7 +3419,7 @@ function loop() {
     if (gr.fuse <= 0) { explode(gr.mesh.position.clone(), gr.team); scene.remove(gr.mesh); liveGrenades.splice(i, 1); }
   }
 
-  // ---- AI update ----
+  // AI update
   if (Frontline.active && !Frontline.matchOver) {
     Frontline.redPlayers.forEach(function(s) { updateFrontlineAI(s, dt); });
     Frontline.bluePlayers.forEach(function(s) { updateFrontlineAI(s, dt); });
@@ -3271,7 +3429,6 @@ function loop() {
     updateCorpses(dt);
   }
 
-  // particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
