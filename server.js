@@ -272,6 +272,58 @@ const routes = {
       user: publicUser(user),
     });
   },
+    // ---- sell a weapon ----
+  'POST /api/sell-weapon': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
+
+    const body = await readBody(req);
+    const weaponId = String(body.weaponId || '').toLowerCase();
+    const def = WEAPON_CATALOG[weaponId];
+    if (!def) return sendJSON(res, 400, { success: false, error: 'Unknown weapon' });
+
+    // Same prices as client — keep in sync
+    const SELL_PRICES = {
+      m16: 0, ak47: 400, m1916: 600, mp5: 750,
+      scar: 1000, minigun: 1500, awp: 1750, grenade: 0,
+    };
+    const price = SELL_PRICES[weaponId] || 0;
+    if (price <= 0) return sendJSON(res, 400, { success: false, error: 'This weapon cannot be sold' });
+
+    // Check ownership: either in ownedWeapons (shop) or in stash
+    let owned = (user.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
+    let stash = (user.stash || '').split(',').filter(Boolean);
+
+    const inOwned = owned.includes(weaponId);
+    const inStash = stash.includes(weaponId);
+    if (!inOwned && !inStash) {
+      return sendJSON(res, 400, { success: false, error: 'You do not own this weapon' });
+    }
+
+    // Prefer removing from stash first, else from owned (unless equipped in loadout)
+    if (inStash) {
+      stash.splice(stash.indexOf(weaponId), 1);
+      user.stash = stash.join(',');
+    } else if (inOwned) {
+      const loadout = (user.loadout || '').split(',').filter(Boolean);
+      if (loadout.includes(weaponId)) {
+        return sendJSON(res, 400, { success: false, error: 'Unequip this weapon from your loadout first' });
+      }
+      owned.splice(owned.indexOf(weaponId), 1);
+      user.ownedWeapons = owned.join(',');
+    }
+
+    user.coins = String((Number(user.coins) || 0) + price);
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+
+    sendJSON(res, 200, {
+      success: true,
+      message: 'Sold ' + def.name + ' for ' + price,
+      user: publicUser(user),
+    });
+  },
+
 
   // ---- save loadout ----
   'POST /api/save-loadout': async (req, res) => {
