@@ -3427,12 +3427,8 @@ function handleInteract() {
   showToast('Nothing to pick up');
 }
 
-function startExtraction(ez) {
-  if (Extraction.extracting) return;
-  Extraction.extracting = true;
-  Extraction.extractT = 0;
-  Extraction.extractZoneId = ez.id;
-  document.getElementById('extractProgress').classList.add('active');
+function updateCoinHud() {
+  document.getElementById('coinCount').textContent = Extraction.coinsThisMatch;
 }
 
 function startExtractionProgress(ez) {
