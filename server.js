@@ -4,7 +4,6 @@ process.on('unhandledRejection', (e) => { console.error('REJECT:', e && e.stack 
 
 // ============================================================
 //  BLOCKY SHOOTER — server.js (Upstash Redis + Weapons Shop)
-//  Accounts, coins, owned weapons, loadouts — survives redeploys.
 // ============================================================
 
 const http = require('http');
@@ -20,8 +19,6 @@ const ADMIN_NAME = process.env.ADMIN_USER || 'Just_12yrs_old';
 const redis = Redis.fromEnv();
 
 // ---------- WEAPON CATALOG ----------
-// Server is the source of truth for prices & ownership.
-// Stats live in the client (index.html) but the ID + price live here.
 const WEAPON_CATALOG = {
   m16:     { price: 0,    name: 'M16' },
   ak47:    { price: 800,  name: 'AK47' },
@@ -32,6 +29,10 @@ const WEAPON_CATALOG = {
   awp:     { price: 3500, name: 'AWP' },
   grenade: { price: 0,    name: 'Grenade' },
 };
+
+// Valid frontline packs (mirrors FRONTLINE_PACKS in the client)
+const VALID_PACKS = ['rifleman', 'breacher', 'scout', 'combat_medic', 'sharpshooter', 'phantom', 'juggernaut'];
+const ALL_PACKS_STRING = VALID_PACKS.join(',');
 
 // ---------- auth ----------
 function hashPassword(password, salt) {
@@ -51,13 +52,10 @@ function makeUser(username, password) {
     highScore: 0,
     totalKills: 0,
     gamesPlayed: 0,
-    coins: isAdmin ? 999999 : 0,
-    // default owned: M16 + Grenade. Admin owns everything.
-    ownedWeapons: isAdmin
-      ? Object.keys(WEAPON_CATALOG).join(',')
-      : 'm16,grenade',
-    // default loadout: M16, sniper-ish (nothing bought yet) — but only owned ones
+    coins: isAdmin ? 9999999 : 0,
+    ownedWeapons: isAdmin ? Object.keys(WEAPON_CATALOG).join(',') : 'm16,grenade',
     loadout: isAdmin ? 'ak47,awp,grenade' : 'm16,grenade',
+    ownedPacks: isAdmin ? ALL_PACKS_STRING : 'rifleman',
     rank: 'Recruit',
     isBanned: 'false',
     isAdmin: isAdmin ? 'true' : 'false',
@@ -67,6 +65,7 @@ function makeUser(username, password) {
 function publicUser(u) {
   const owned = (u.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
   const loadout = (u.loadout || 'm16,grenade').split(',').filter(Boolean);
+  const ownedPacks = (u.ownedPacks || 'rifleman').split(',').filter(Boolean);
   return {
     username: u.username,
     highScore: Number(u.highScore) || 0,
@@ -75,6 +74,7 @@ function publicUser(u) {
     coins: Number(u.coins) || 0,
     ownedWeapons: owned,
     loadout: loadout,
+    ownedPacks: ownedPacks,
     rank: u.rank || 'Recruit',
     last_save: u.lastSave ? Number(u.lastSave) : null,
     isAdmin: u.isAdmin === 'true' || u.isAdmin === true,
@@ -90,6 +90,7 @@ async function getUser(username) {
   if (data.coins === undefined) data.coins = '0';
   if (data.ownedWeapons === undefined) data.ownedWeapons = 'm16,grenade';
   if (data.loadout === undefined) data.loadout = 'm16,grenade';
+  if (data.ownedPacks === undefined) data.ownedPacks = 'rifleman';
   return data;
 }
 async function saveUser(user) {
@@ -147,7 +148,6 @@ const routes = {
     }
   },
 
-  // public catalog so client can display prices/names
   'GET /api/weapons': (req, res) => {
     sendJSON(res, 200, { weapons: WEAPON_CATALOG });
   },
@@ -206,7 +206,7 @@ const routes = {
     sendJSON(res, 200, { success: true, user: publicUser(user) });
   },
 
-  // ---- buy a weapon with coins ----
+  // ---- buy a weapon ----
   'POST /api/buy-weapon': async (req, res) => {
     const user = await authUser(req);
     if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
@@ -224,7 +224,6 @@ const routes = {
     const isAdmin = user.isAdmin === 'true' || user.isAdmin === true;
     const coins = Number(user.coins) || 0;
 
-    // Admin gets it free
     if (!isAdmin) {
       if (coins < def.price) {
         return sendJSON(res, 400, { success: false, error: 'Not enough coins' });
@@ -244,7 +243,7 @@ const routes = {
     });
   },
 
-  // ---- save loadout (which weapons to bring) ----
+  // ---- save loadout ----
   'POST /api/save-loadout': async (req, res) => {
     const user = await authUser(req);
     if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
@@ -256,14 +255,12 @@ const routes = {
     }
 
     const owned = (user.ownedWeapons || 'm16,grenade').split(',').filter(Boolean);
-    // validate every weapon in the loadout is owned
     for (let i = 0; i < loadout.length; i++) {
       const id = String(loadout[i] || '').toLowerCase();
       if (!WEAPON_CATALOG[id]) return sendJSON(res, 400, { success: false, error: 'Unknown weapon: ' + id });
       if (!owned.includes(id)) return sendJSON(res, 400, { success: false, error: 'You do not own: ' + id });
     }
 
-    // dedupe
     const unique = [];
     for (let i = 0; i < loadout.length; i++) {
       const id = String(loadout[i]).toLowerCase();
@@ -276,6 +273,39 @@ const routes = {
     sendJSON(res, 200, { success: true, loadout: unique });
   },
 
+  // ---- save coins (used for in-match coin updates) ----
+  'POST /api/save-coins': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+
+    const body = await readBody(req);
+    const coins = Number(body.coins);
+    if (!isFinite(coins) || coins < 0 || coins > 1e12) {
+      return sendJSON(res, 400, { success: false, error: 'Invalid coin value' });
+    }
+
+    user.coins = String(Math.floor(coins));
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+    sendJSON(res, 200, { success: true, coins: Number(user.coins) });
+  },
+
+  // ---- save owned packs (permanent frontline pack ownership) ----
+  'POST /api/save-packs': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+
+    const body = await readBody(req);
+    const packs = Array.isArray(body.packs) ? body.packs : [];
+    const filtered = packs.filter(function(p) { return VALID_PACKS.includes(p); });
+    if (!filtered.includes('rifleman')) filtered.push('rifleman');
+
+    user.ownedPacks = filtered.join(',');
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+    sendJSON(res, 200, { success: true, ownedPacks: filtered });
+  },
+
   // ---- submit score + award coins ----
   'POST /api/score': async (req, res) => {
     const user = await authUser(req);
@@ -286,8 +316,6 @@ const routes = {
       return sendJSON(res, 400, { success: false, error: 'Invalid score' });
     }
 
-    // Coins awarded per kill are sent by the client as an aggregate "coinsEarned".
-    // Cap it to prevent blatant tampering.
     let coinsEarned = 0;
     if (typeof body.coinsEarned === 'number' && isFinite(body.coinsEarned)) {
       coinsEarned = Math.max(0, Math.min(50000, Math.floor(body.coinsEarned)));
@@ -313,6 +341,7 @@ const routes = {
     });
   },
 
+  // ---- leaderboard (returns both highScore and coins) ----
   'GET /api/leaderboard': async (req, res) => {
     const keys = await redis.keys('user:*');
     const users = [];
@@ -396,6 +425,7 @@ server.listen(PORT, async function() {
       const pw = crypto.randomBytes(9).toString('base64url');
       const user = makeUser(ADMIN_NAME, pw);
       user.highScore = '999999';
+      user.coins = '9999999';
       user.isAdmin = 'true';
       await saveUser(user);
       console.log('');
@@ -410,4 +440,35 @@ server.listen(PORT, async function() {
   } catch (e) {
     console.error('Admin setup failed:', e.message);
   }
+
+  // Top up admin on every boot (in case coins got spent)
+  try {
+    const adm = await getUser(ADMIN_NAME);
+    if (adm && (adm.isAdmin === 'true' || adm.isAdmin === true)) {
+      let dirty = false;
+      if (Number(adm.coins) < 9999999) {
+        adm.coins = '9999999';
+        dirty = true;
+      }
+      if (Number(adm.highScore) < 999999) {
+        adm.highScore = '999999';
+        dirty = true;
+      }
+      // Make sure admin owns all packs
+      const admPacks = (adm.ownedPacks || '').split(',').filter(Boolean);
+      if (admPacks.length < VALID_PACKS.length) {
+        adm.ownedPacks = ALL_PACKS_STRING;
+        dirty = true;
+      }
+      if (dirty) {
+        adm.lastSeen = String(Date.now());
+        await saveUser(adm);
+        console.log('Admin topped up: 9,999,999 coins + all packs 🪙');
+      }
+    }
+  } catch (e) {
+    console.error('Admin top-up failed:', e.message);
+  }
+
+  console.log('');
 });
