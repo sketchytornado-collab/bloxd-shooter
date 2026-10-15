@@ -849,6 +849,32 @@
 // ================= GAME CONFIG =================
 const CONFIG = { platform: 'pc', mapKey: 'extraction', mode: 'extraction' };
 
+// ================= ON-SCREEN ERROR REPORTER =================
+(function() {
+  function showError(msg) {
+    let box = document.getElementById('__errBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = '__errBox';
+      box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;' +
+        'background:rgba(140,0,0,0.96);color:#fff;font:12px monospace;' +
+        'padding:10px;white-space:pre-wrap;max-height:50vh;overflow:auto;' +
+        'border-bottom:3px solid #f00;';
+      box.onclick = function() { box.remove(); };
+      document.body.appendChild(box);
+    }
+    box.textContent += msg + '\n\n(tap to dismiss)\n';
+  }
+  window.addEventListener('error', function(e) {
+    showError('ERROR: ' + (e.message || 'unknown') +
+      '\n  at ' + (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?'));
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    showError('PROMISE REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+  window.__showError = showError;
+})();
+
 // ================= WEAPON CATALOG =================
 const WEAPON_INFO = {
   m16:     { name: 'M16',     price: 0,    icon: '🔫' },
