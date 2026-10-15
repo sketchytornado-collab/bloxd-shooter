@@ -1959,7 +1959,7 @@ function buildWorld(mapKey) {
   const def = MAPS[mapKey];
   currentMapDef = def;
   buildMapTextures(def);
-  MAP = def.grid;
+  MAP = def.grid || def;
   MAP_W = MAP[0].length; MAP_H = MAP.length;
   scene.background = new THREE.Color(def.sky);
   scene.fog = new THREE.Fog(def.sky, def.fog[0], def.fog[1]);
