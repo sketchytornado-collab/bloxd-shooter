@@ -1916,9 +1916,9 @@ const HEIGHT = { 1: TILE, 2: 1.3, 3: 1.7 };
 
 function buildWorld(mapKey) {
   while (worldGroup.children.length) {
-    const c = worldGroup.children.pop();
-    if (c.geometry) c.geometry.dispose();
+    const c = worldGroup.children[0];
     worldGroup.remove(c);
+    if (c.geometry) c.geometry.dispose();
   }
   while (captureZoneVisuals.children.length) {
     const c = captureZoneVisuals.children.pop();
@@ -3417,7 +3417,7 @@ function handleInteract() {
     for (const ez of currentMapDef.extractionZones) {
       const d = Math.hypot(player.pos.x - ez.cx * TILE, player.pos.z - ez.cz * TILE);
       if (d < 4) {
-        startExtraction(ez);
+        startExtractionProgress(ez);
         return;
       }
     }
@@ -3435,13 +3435,20 @@ function startExtraction(ez) {
   document.getElementById('extractProgress').classList.add('active');
 }
 
+function startExtractionProgress(ez) {
+  if (Extraction.extracting) return;
+  Extraction.extracting = true;
+  Extraction.extractT = 0;
+  Extraction.extractZoneId = ez.id;
+  document.getElementById('extractProgress').classList.add('active');
+}
+
 function cancelExtraction() {
   if (!Extraction.extracting) return;
   Extraction.extracting = false;
   Extraction.extractT = 0;
   document.getElementById('extractProgress').classList.remove('active');
 }
-
 // ================= MINIMAP =================
 const minimap = document.getElementById('minimap');
 const mmCtx = minimap.getContext('2d');
@@ -4039,7 +4046,7 @@ function startSurvival() {
 }
 
 // ================= START EXTRACTION =================
-function startExtraction() {
+function startExtractionMode() {
   Frontline.active = false;
   Extraction.active = true;
   document.getElementById('frontlineHud').classList.remove('active');
@@ -4126,7 +4133,7 @@ function applyEquippedArmor() {
 // ================= START GAME =================
 function startGame() {
   if (CONFIG.mode === 'frontline') startFrontline();
-  else if (CONFIG.mode === 'extraction') startExtraction();
+  else if (CONFIG.mode === 'extraction') startExtractionMode();
   else startSurvival();
 }
 
