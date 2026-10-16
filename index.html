@@ -579,6 +579,110 @@
   }
   #muteHint { position: fixed; bottom: 4px; left: 8px; font: 11px monospace;
               color: rgba(255,255,255,0.4); pointer-events: none; z-index: 60; }
+  
+  /* ============ INVENTORY (Simple) ============ */
+  #inventoryModal {
+    position: fixed; inset: 0; z-index: 250; display: none;
+    flex-direction: column; align-items: center; justify-content: flex-start;
+    background: #050a14; color: #fff; font-family: monospace;
+    padding: 24px 16px; padding-top: max(24px, env(safe-area-inset-top));
+    overflow-y: auto;
+  }
+  #inventoryModal.active { display: flex; }
+
+  .inv-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    width: 100%; max-width: 900px; margin-bottom: 20px;
+  }
+  .inv-title { font-size: 24px; color: #4bea8b; letter-spacing: 3px;
+               text-shadow: 0 0 20px rgba(75,234,139,0.4); }
+  .inv-hint { font-size: 12px; color: #8899aa; }
+  .inv-hint .key {
+    display: inline-block; background: #222; border: 1px solid #555;
+    padding: 1px 7px; border-radius: 4px; color: #fff; font-weight: bold;
+    margin: 0 2px;
+  }
+
+  .inv-body {
+    display: flex; gap: 24px; width: 100%; max-width: 900px;
+    flex-wrap: wrap; justify-content: center;
+  }
+
+  .inv-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .inv-item {
+    background: linear-gradient(135deg, rgba(30,40,55,0.95), rgba(15,22,32,0.95));
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 14px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+  .inv-item:hover { transform: translateY(-3px); }
+  .inv-item.selected { transform: translateY(-3px) scale(1.03); }
+  .inv-item .inv-icon { font-size: 44px; line-height: 1; margin-bottom: 6px; }
+  .inv-item .inv-name { font-size: 12px; color: #fff; font-weight: bold;
+                        letter-spacing: 1px; }
+  .inv-item .inv-tier-line { font-size: 9px; letter-spacing: 2px; margin-top: 4px; }
+  .inv-item .inv-stripe {
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  }
+
+  /* Rarity borders + glows + stripes */
+  .inv-item.tier-common    { border-color: #8a8a8a; }
+  .inv-item.tier-common    .inv-stripe { background: #8a8a8a; }
+  .inv-item.tier-common    .inv-tier-line { color: #8a8a8a; }
+  .inv-item.tier-uncommon  { border-color: #4bea8b; box-shadow: 0 0 12px rgba(75,234,139,0.35); }
+  .inv-item.tier-uncommon  .inv-stripe { background: #4bea8b; }
+  .inv-item.tier-uncommon  .inv-tier-line { color: #4bea8b; }
+  .inv-item.tier-rare      { border-color: #4a9eff; box-shadow: 0 0 14px rgba(74,158,255,0.45); }
+  .inv-item.tier-rare      .inv-stripe { background: #4a9eff; }
+  .inv-item.tier-rare      .inv-tier-line { color: #4a9eff; }
+  .inv-item.tier-epic      { border-color: #aa66ff; box-shadow: 0 0 16px rgba(170,102,255,0.55); }
+  .inv-item.tier-epic      .inv-stripe { background: #aa66ff; }
+  .inv-item.tier-epic      .inv-tier-line { color: #aa66ff; }
+  .inv-item.tier-legendary { border-color: #ffd94a; box-shadow: 0 0 18px rgba(255,217,74,0.65); }
+  .inv-item.tier-legendary .inv-stripe { background: #ffd94a; }
+  .inv-item.tier-legendary .inv-tier-line { color: #ffd94a; }
+  .inv-item.tier-red       { border-color: #ff4444; box-shadow: 0 0 16px rgba(255,68,68,0.6); }
+  .inv-item.tier-red       .inv-stripe { background: #ff4444; }
+  .inv-item.tier-red       .inv-tier-line { color: #ff4444; }
+
+  .inv-detail {
+    width: 300px; min-height: 260px;
+    background: #0d1420; border: 2px solid #1e2a3d; border-radius: 8px;
+    padding: 16px;
+  }
+  .inv-detail-empty {
+    color: #566; font-size: 13px; text-align: center;
+    padding-top: 100px; letter-spacing: 1px;
+  }
+  .inv-detail .d-name { font-size: 20px; font-weight: bold; margin-bottom: 6px; }
+  .inv-detail .d-tier {
+    display: inline-block; font-size: 10px; letter-spacing: 2px;
+    padding: 2px 8px; border-radius: 3px; margin-bottom: 14px;
+    border: 1px solid currentColor;
+  }
+  .inv-detail .d-row {
+    display: flex; justify-content: space-between;
+    font-size: 12px; padding: 4px 0;
+    border-bottom: 1px solid #1a2330; color: #8899aa;
+  }
+  .inv-detail .d-row span:last-child { color: #fff; }
+  .inv-detail .d-desc {
+    margin-top: 14px; font-size: 11px; color: #7788aa;
+    line-height: 1.6; font-style: italic;
+  }
+
 </style>
 </head>
 <body>
@@ -770,6 +874,19 @@
   <div id="extractProgressBar"><div id="extractProgressFill"></div></div>
 </div>
 
+<div id="inventoryModal">
+  <div class="inv-header">
+    <span class="inv-title">🎒 INVENTORY</span>
+    <span class="inv-hint">Press <span class="key">R</span> to close</span>
+  </div>
+  <div class="inv-body">
+    <div id="invItems" class="inv-items"></div>
+    <div id="invDetail" class="inv-detail">
+      <div class="inv-detail-empty">Click an item to inspect it</div>
+    </div>
+  </div>
+</div>
+
 <div id="pickupPrompt"></div>
 
 <div id="matchEnd">
@@ -889,6 +1006,33 @@ const WEAPON_INFO = {
   awp:     { name: 'AWP',     price: 3500, icon: '🎯' },
   grenade: { name: 'Grenade', price: 0,    icon: '💣' },
 };
+// ================= ITEM RARITY TABLES =================
+const RARITY = {
+  common:    { color: '#8a8a8a', label: 'COMMON'    },
+  uncommon:  { color: '#4bea8b', label: 'UNCOMMON'  },
+  rare:      { color: '#4a9eff', label: 'RARE'      },
+  epic:      { color: '#aa66ff', label: 'EPIC'      },
+  legendary: { color: '#ffd94a', label: 'LEGENDARY' },
+  red:       { color: '#ff4444', label: 'SPECIAL'   },
+};
+
+const WEAPON_TIER = {
+  m16:     'common',
+  mp5:     'common',
+  grenade: 'common',
+  ak47:    'uncommon',
+  m1916:   'uncommon',
+  scar:    'rare',
+  minigun: 'epic',
+  awp:     'legendary',
+};
+
+const ARMOR_TIER = {
+  none:  'common',
+  light: 'common',
+  heavy: 'rare',
+};
+
 // ================= SELL PRICES =================
 // What a weapon is worth when you sell it. Usually ~50% of buy price.
 const WEAPON_SELL_PRICE = {
@@ -3443,6 +3587,9 @@ addEventListener('keydown', function(e) {
   if (e.code === 'Digit3') switchWeapon(2);
   if (e.code === 'KeyQ') switchWeapon((currentWeapon + 1) % activeLoadout.length);
   if (e.code === 'KeyM') { const m = Audio.toggleMute(); document.getElementById('muteHint').textContent = m ? 'MUTED — M to unmute' : 'M = mute'; }
+  if (e.code === 'KeyR' && running && !Frontline.dead) { toggleInventory(); }
+  if (e.code === 'Escape' && Inventory.open) { closeInventory(); }
+
   if (e.code === 'KeyB' && Frontline.active) openPackShop();
   if (e.code === 'KeyE') {
     if (CONFIG.mode === 'extraction') handleInteract();
@@ -3533,6 +3680,133 @@ function startExtractionProgress(ez) {
   Extraction.extractT = 0;
   Extraction.extractZoneId = ez.id;
   document.getElementById('extractProgress').classList.add('active');
+}
+// ================= INVENTORY (Simple) =================
+const Inventory = {
+  open: false,
+  selectedKey: null,
+};
+
+// What's in the player's backpack this run.
+function getBackpackItems() {
+  const items = [];
+  const seen = {};
+  // Weapons equipped in hotbar
+  activeLoadout.forEach(function(id) {
+    if (id && WEAPON_INFO[id]) {
+      const key = 'weapon:' + id;
+      if (!seen[key]) { seen[key] = true; items.push({ id: id, kind: 'weapon' }); }
+    }
+  });
+  // Weapons looted this extraction run
+  Extraction.lootedWeapons.forEach(function(id) {
+    if (id && WEAPON_INFO[id]) {
+      const key = 'weapon:' + id;
+      if (!seen[key]) { seen[key] = true; items.push({ id: id, kind: 'weapon' }); }
+    }
+  });
+  // Armor currently equipped
+  const eqArmor = (Account.user && Account.user.equippedArmor) || 'none';
+  if (eqArmor && eqArmor !== 'none') {
+    items.push({ id: eqArmor, kind: 'armor' });
+  }
+  // Armor looted this run
+  Extraction.lootedArmor.forEach(function(id) {
+    if (id && ARMOR_INFO[id]) {
+      const key = 'armor:' + id;
+      if (!seen[key]) { seen[key] = true; items.push({ id: id, kind: 'armor' }); }
+    }
+  });
+  return items;
+}
+
+function getItemMeta(item) {
+  if (item.kind === 'weapon') {
+    const info = WEAPON_INFO[item.id];
+    return {
+      name: info ? info.name : item.id,
+      icon: info ? info.icon : '🔫',
+      tier: WEAPON_TIER[item.id] || 'common',
+      desc: 'A firearm. Can be equipped from the Loadout screen.',
+    };
+  } else {
+    const info = ARMOR_INFO[item.id];
+    return {
+      name: info ? info.name : item.id,
+      icon: info ? info.icon : '🛡️',
+      tier: ARMOR_TIER[item.id] || 'common',
+      desc: info && info.absorb > 0
+        ? 'Absorbs ' + info.absorb + ' damage before HP.'
+        : 'No protection.',
+    };
+  }
+}
+
+function renderInventory() {
+  const wrap = document.getElementById('invItems');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  const items = getBackpackItems();
+  if (items.length === 0) {
+    wrap.innerHTML = '<div style="color:#566;font-size:13px;padding:20px;grid-column:1/-1;text-align:center">Backpack is empty.</div>';
+    return;
+  }
+
+  items.forEach(function(it) {
+    const meta = getItemMeta(it);
+    const rarity = RARITY[meta.tier] || RARITY.common;
+    const key = it.kind + ':' + it.id;
+    const el = document.createElement('div');
+    el.className = 'inv-item tier-' + meta.tier;
+    if (Inventory.selectedKey === key) el.classList.add('selected');
+    el.innerHTML =
+      '<div class="inv-stripe"></div>' +
+      '<div class="inv-icon">' + meta.icon + '</div>' +
+      '<div class="inv-name">' + meta.name + '</div>' +
+      '<div class="inv-tier-line" style="color:' + rarity.color + '">' + rarity.label + '</div>';
+    el.addEventListener('click', function() {
+      Inventory.selectedKey = key;
+      renderInventory();
+      renderInventoryDetail(meta);
+    });
+    wrap.appendChild(el);
+  });
+}
+
+function renderInventoryDetail(meta) {
+  const d = document.getElementById('invDetail');
+  if (!d) return;
+  const rarity = RARITY[meta.tier] || RARITY.common;
+  d.innerHTML =
+    '<div class="d-name" style="color:' + rarity.color + '">' + meta.name + '</div>' +
+    '<div class="d-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
+    '<div class="d-desc">' + meta.desc + '</div>';
+}
+
+function openInventory() {
+  if (!running) return;
+  Inventory.open = true;
+  Inventory.selectedKey = null;
+  document.getElementById('inventoryModal').classList.add('active');
+  document.getElementById('invDetail').innerHTML =
+    '<div class="inv-detail-empty">Click an item to inspect it</div>';
+  renderInventory();
+  if (CONFIG.platform === 'pc') document.exitPointerLock();
+}
+
+function closeInventory() {
+  if (!Inventory.open) return;
+  Inventory.open = false;
+  document.getElementById('inventoryModal').classList.remove('active');
+  if (CONFIG.platform === 'pc' && gameStarted && running) {
+    renderer.domElement.requestPointerLock();
+  }
+}
+
+function toggleInventory() {
+  if (Inventory.open) closeInventory();
+  else openInventory();
 }
 
 function cancelExtraction() {
@@ -4365,6 +4639,7 @@ function showSurvivalDeath() {
 function loop() {
   requestAnimationFrame(loop);
   if (!running) { renderer.render(scene, camera); return; }
+  if (Inventory.open) { renderer.render(scene, camera); return; }
   const dt = Math.min(clock.getDelta(), 0.05);
   const weaponId = getActiveWeaponId();
   const weapon = WEAPON_STATS[weaponId];
