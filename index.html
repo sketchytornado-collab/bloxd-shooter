@@ -3474,6 +3474,8 @@ function updateChests(dt) {
 let chestOpening_chest = null;
 function startChestOpen(chest) {
   if (!chest || chest.opened || chestOpening) return;
+  // Cancel any extraction in progress
+  if (Extraction.extracting) cancelExtraction();
   chestOpening = true;
   chestOpening_chest = chest;
   chestOpenT = 0;
@@ -3482,7 +3484,6 @@ function startChestOpen(chest) {
   document.getElementById('extractProgressFill').style.width = '0%';
   document.getElementById('extractProgress').classList.add('active');
 }
-
 function openChest(chest) {
   if (chest.opened) return;
   chest.opened = true;
@@ -4175,12 +4176,7 @@ function showToast(text) {
 // ================= INTERACTION (Extraction) =================
 function handleInteract() {
   if (!Extraction.active || Extraction.dead || Extraction.finished) return;
-  // Priority 1: near a chest — start opening
-  if (nearestChest && !chestOpening) {
-    startChestOpen(nearestChest);
-    return;
-  }
-  // Priority 2: if in extraction zone, start extraction
+  // Priority 1: if in extraction zone, start extraction
   if (currentMapDef.extractionZones) {
     for (const ez of currentMapDef.extractionZones) {
       const d = Math.hypot(player.pos.x - ez.cx * TILE, player.pos.z - ez.cz * TILE);
@@ -4190,7 +4186,12 @@ function handleInteract() {
       }
     }
   }
-  // Priority 2: pickup loot
+  // Priority 2: near a chest — start opening
+  if (nearestChest && !chestOpening) {
+    startChestOpen(nearestChest);
+    return;
+  }
+  // Priority 3: pickup loot
   if (tryPickup()) return;
   showToast('Nothing to pick up');
 }
@@ -4201,9 +4202,17 @@ function updateCoinHud() {
 
 function startExtractionProgress(ez) {
   if (Extraction.extracting) return;
+  // Cancel any chest opening so they don't collide
+  if (chestOpening) {
+    chestOpening = false;
+    chestOpenT = 0;
+  }
   Extraction.extracting = true;
   Extraction.extractT = 0;
   Extraction.extractZoneId = ez.id;
+  const labelEl = document.querySelector('#extractProgress .label');
+  if (labelEl) labelEl.textContent = 'EXTRACTING';
+  document.getElementById('extractProgressFill').style.width = '0%';
   document.getElementById('extractProgress').classList.add('active');
 }
 // ================= INVENTORY (Simple) =================
