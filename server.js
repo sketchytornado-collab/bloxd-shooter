@@ -445,7 +445,7 @@ const routes = {
       const stash = (user.stash || '').split(',').filter(Boolean);
       lootedWeapons.forEach(function(w) {
         const id = String(w || '').toLowerCase();
-        if (WEAPON_CATALOG[id] && !stash.includes(id)) stash.push(id);
+        if (WEAPON_CATALOG[id]) stash.push(id);
       });
       user.stash = stash.join(',');
 
