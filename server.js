@@ -35,6 +35,19 @@ const WEAPON_CATALOG = {
 const VALID_PACKS = ['rifleman', 'breacher', 'scout', 'combat_medic', 'sharpshooter', 'phantom', 'juggernaut'];
 const ALL_PACKS_STRING = VALID_PACKS.join(',');
 
+// Valuable catalog (trinkets — sell for coins, not equipment)
+const VALUABLE_CATALOG = {
+  scrap:        { name: 'Scrap Metal',    price: 30   },
+  ration:       { name: 'Ration Can',     price: 50   },
+  apple:        { name: 'Apple',          price: 40   },
+  hard_drive:   { name: 'Hard Drive',     price: 200  },
+  radio_part:   { name: 'Radio Part',     price: 250  },
+  gold_ring:    { name: 'Gold Ring',      price: 350  },
+  gold_bar:     { name: 'Gold Bar',       price: 800  },
+  battery_cell: { name: 'Battery Cell',   price: 600  },
+  star_of_africa: { name: 'Star of Africa', price: 3000 },
+};
+
 // Armor catalog
 const ARMOR_CATALOG = {
   none:  { name: 'None',        absorb: 0,   price: 0 },
@@ -66,6 +79,7 @@ function makeUser(username, password) {
     ownedPacks: isAdmin ? ALL_PACKS_STRING : 'rifleman',
     // Extraction mode fields
     stash: isAdmin ? Object.keys(WEAPON_CATALOG).join(',') : '',    // comma-separated weapon ids
+    valuables: isAdmin ? Object.keys(VALUABLE_CATALOG).join(',') : '', // comma-separated valuable ids
     safeBox: '',                                                      // comma-separated, max 2
     equippedArmor: isAdmin ? 'heavy' : 'none',                        // none | light | heavy
     ownedArmor: isAdmin ? 'light,heavy' : '',                         // armor ids you've extracted
@@ -83,6 +97,7 @@ function publicUser(u) {
   const loadout = (u.loadout || 'm16,grenade').split(',').filter(Boolean);
   const ownedPacks = (u.ownedPacks || 'rifleman').split(',').filter(Boolean);
   const stash = (u.stash || '').split(',').filter(Boolean);
+  const valuables = (u.valuables || '').split(',').filter(Boolean);
   const safeBox = (u.safeBox || '').split(',').filter(Boolean);
   const ownedArmor = (u.ownedArmor || '').split(',').filter(Boolean);
   return {
@@ -95,6 +110,7 @@ function publicUser(u) {
     loadout: loadout,
     ownedPacks: ownedPacks,
     stash: stash,
+    valuables: valuables,
     safeBox: safeBox,
     equippedArmor: u.equippedArmor || 'none',
     ownedArmor: ownedArmor,
@@ -118,6 +134,7 @@ async function getUser(username) {
   if (data.loadout === undefined) data.loadout = 'm16,grenade';
   if (data.ownedPacks === undefined) data.ownedPacks = 'rifleman';
   if (data.stash === undefined) data.stash = '';
+  if (data.valuables === undefined) data.valuables = '';
   if (data.safeBox === undefined) data.safeBox = '';
   if (data.equippedArmor === undefined) data.equippedArmor = 'none';
   if (data.ownedArmor === undefined) data.ownedArmor = '';
@@ -327,6 +344,32 @@ const routes = {
     });
   },
 
+  // ---- sell a valuable ----
+  'POST /api/sell-valuable': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not logged in' });
+
+    const body = await readBody(req);
+    const valuableId = String(body.valuableId || '').toLowerCase();
+    const def = VALUABLE_CATALOG[valuableId];
+    if (!def) return sendJSON(res, 400, { success: false, error: 'Unknown valuable' });
+
+    let valuables = (user.valuables || '').split(',').filter(Boolean);
+    const idx = valuables.indexOf(valuableId);
+    if (idx === -1) return sendJSON(res, 400, { success: false, error: 'You do not own this item' });
+
+    valuables.splice(idx, 1);
+    user.valuables = valuables.join(',');
+    user.coins = String((Number(user.coins) || 0) + def.price);
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+
+    sendJSON(res, 200, {
+      success: true,
+      message: 'Sold ' + def.name + ' for ' + def.price,
+      user: publicUser(user),
+    });
+  },
 
   // ---- save loadout ----
   'POST /api/save-loadout': async (req, res) => {
@@ -452,6 +495,7 @@ const routes = {
     const success = body.success === true;
     const lootedWeapons = Array.isArray(body.lootedWeapons) ? body.lootedWeapons : [];
     const lootedArmor = Array.isArray(body.lootedArmor) ? body.lootedArmor : [];
+    const lootedValuables = Array.isArray(body.lootedValuables) ? body.lootedValuables : [];
     const coinsCollected = Math.max(0, Math.min(50000, Number(body.coinsCollected) || 0));
 
     user.lastSeen = String(Date.now());
@@ -472,6 +516,14 @@ const routes = {
         if (ARMOR_CATALOG[id] && id !== 'none' && !ownedArmor.includes(id)) ownedArmor.push(id);
       });
       user.ownedArmor = ownedArmor.join(',');
+
+      // Add looted valuables to user's valuables list
+      const valuables = (user.valuables || '').split(',').filter(Boolean);
+      lootedValuables.forEach(function(v) {
+        const id = String(v || '').toLowerCase();
+        if (VALUABLE_CATALOG[id]) valuables.push(id);
+      });
+      user.valuables = valuables.join(',');
 
       // Add coins
       user.coins = String((Number(user.coins) || 0) + coinsCollected);
