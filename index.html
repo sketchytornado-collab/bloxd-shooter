@@ -963,8 +963,7 @@
   <div style="color:#ffd94a;font-size:13px;margin:20px 0 6px">VALUABLES:</div>
   <div id="valuablesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-width:720px;width:100%;"></div>
 
-    <div style="color:#4bea8b;font-size:13px;margin:20px 0 6px">SELL WEAPONS — click to sell for coins</div>
-  <div id="sellGrid" class="stash-items-grid"></div>
+    <div style="color:#4bea8b;font-size:13px;margin:20px 0 6px">RIGHT-CLICK ANY ITEM TO SELL IT</div>
 
   <div id="stashMsg"></div>
   <button class="closeBtn" id="stashClose">CLOSE</button>
@@ -1305,7 +1304,7 @@ const WEAPON_SELL_PRICE = {
   scar:    1000,
   minigun: 1500,
   awp:     1750,
-  grenade: 0,
+  grenade: 25,
 };
 
 const WEAPON_STATS = {
@@ -1693,7 +1692,7 @@ function renderStash() {
     armorRow.appendChild(card);
   });
 
-  // Stash items grid — rarity-tinted cards
+    // Stash items grid — left-click inspect / right-click sell
   const stashGrid = document.getElementById('stashGrid');
   stashGrid.innerHTML = '';
   const stash = Account.user.stash || [];
@@ -1704,24 +1703,21 @@ function renderStash() {
       const info = WEAPON_INFO[id]; if (!info) return;
       const tier = WEAPON_TIER[id] || 'common';
       const rarity = RARITY[tier] || RARITY.common;
+      const price = WEAPON_SELL_PRICE[id] || 0;
       const card = document.createElement('div');
       card.className = 'stash-item tier-' + tier;
+      card.title = 'Left-click: inspect   •   Right-click: sell for 🪙 ' + price;
       card.innerHTML =
         '<div class="si-stripe"></div>' +
         '<div class="si-icon">' + info.icon + '</div>' +
         '<div class="si-name">' + info.name + '</div>' +
-        '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>';
-      card.addEventListener('click', function() {
-        document.querySelectorAll('.stash-item').forEach(function(el) {
-          el.classList.remove('selected');
-        });
-        card.classList.add('selected');
-        showStashDetail(id);
-      });
+        '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
+        (price > 0 ? '<div class="si-price">🪙 ' + price + '</div>' : '');
+      wireStashCard(card, 'weapon', id);
       stashGrid.appendChild(card);
     });
   }
-  // Valuables grid — text-icon cards, colored by tier
+  // Valuables grid — left-click inspect, right-click sell
   const valGrid = document.getElementById('valuablesGrid');
   if (valGrid) {
     valGrid.innerHTML = '';
@@ -1734,7 +1730,7 @@ function renderStash() {
         const rarity = RARITY[info.tier] || RARITY.common;
         const card = document.createElement('div');
         card.className = 'stash-item tier-' + info.tier;
-        card.style.cursor = 'pointer';
+        card.title = 'Left-click: inspect   •   Right-click: sell for 🪙 ' + info.price;
         card.innerHTML =
           '<div class="si-stripe"></div>' +
           '<div class="si-icon" style="padding:10px 0;"></div>' +
@@ -1743,17 +1739,48 @@ function renderStash() {
           '<div class="si-price">🪙 ' + info.price + '</div>';
         const iconSlot = card.querySelector('.si-icon');
         iconSlot.appendChild(makeValuableIcon(id, 48));
-        card.addEventListener('click', function() {
-          if (confirm('Sell ' + info.name + ' for 🪙 ' + info.price + '?')) {
-            sellValuable(id);
-          }
-        });
+        wireStashCard(card, 'valuable', id);
         valGrid.appendChild(card);
       });
     }
   }
+}
 
-  renderSellGrid();
+// Attach left-click = inspect, right-click = sell to any stash/valuable card
+function wireStashCard(el, kind, id) {
+  // LEFT CLICK — inspect
+  el.addEventListener('click', function(e) {
+    e.preventDefault();
+    document.querySelectorAll('.stash-item').forEach(function(n) {
+      n.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    if (kind === 'weapon') showStashDetail(id);
+    else showValuableDetail(id);
+  });
+
+  // RIGHT CLICK — sell
+  el.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (kind === 'weapon') sellWeapon(id);
+    else sellValuable(id);
+  });
+}
+
+function showValuableDetail(id) {
+  const detail = document.getElementById('stashDetail');
+  if (!detail) return;
+  const info = VALUABLE_INFO[id];
+  if (!info) { detail.style.display = 'none'; return; }
+  const rarity = RARITY[info.tier] || RARITY.common;
+  detail.style.display = 'block';
+  detail.innerHTML =
+    '<div class="sd-name" style="color:' + rarity.color + '">' + info.name + '</div>' +
+    '<div class="sd-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
+    '<div class="sd-row"><span>SELL PRICE</span><span>🪙 ' + info.price + '</span></div>' +
+    '<div class="sd-row"><span>TYPE</span><span>Valuable</span></div>' +
+    '<div class="sd-row"><span>SOURCE</span><span>Found in chests</span></div>';
 }
 
 function showStashDetail(id) {
@@ -1771,46 +1798,6 @@ function showStashDetail(id) {
     '<div class="sd-row"><span>SELL PRICE</span><span>🪙 ' + price + '</span></div>' +
     '<div class="sd-row"><span>TYPE</span><span>Weapon</span></div>' +
     '<div class="sd-row"><span>SOURCE</span><span>Extracted from raid</span></div>';
-}
-
-
-function renderSellGrid() {
-  const grid = document.getElementById('sellGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  grid.className = 'stash-items-grid';
-  const pool = [];
-  (Account.user.ownedWeapons || []).forEach(function(w) { if (!pool.includes(w)) pool.push(w); });
-  (Account.user.stash || []).forEach(function(w) { pool.push(w); });
-
-  if (pool.length === 0) {
-    grid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;grid-column:1/-1;text-align:center">No weapons to sell.</div>';
-    return;
-  }
-
-  pool.forEach(function(id) {
-    const info = WEAPON_INFO[id]; if (!info) return;
-    const price = WEAPON_SELL_PRICE[id] || 0;
-    const tier = WEAPON_TIER[id] || 'common';
-    const rarity = RARITY[tier] || RARITY.common;
-    const card = document.createElement('div');
-    card.className = 'stash-item tier-' + tier;
-    card.innerHTML =
-      '<div class="si-stripe"></div>' +
-      '<div class="si-icon">' + info.icon + '</div>' +
-      '<div class="si-name">' + info.name + '</div>' +
-      '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
-      '<div class="si-price">🪙 ' + price + '</div>';
-      if (price <= 0) {
-      card.style.opacity = '0.4';
-      card.style.cursor = 'default';
-      card.title = 'This weapon cannot be sold.';
-    } else {
-      card.title = 'Click to sell for 🪙 ' + price;
-      card.addEventListener('click', function() { sellWeapon(id); });
-    }
-    grid.appendChild(card);
-  });
 }
 async function sellValuable(id) {
   const info = VALUABLE_INFO[id]; if (!info) return;
@@ -3167,10 +3154,11 @@ const Frontline = {
 // ================= EXTRACTION STATE =================
 const Extraction = {
   active: false,
-  lootItems: [],        // { id, kind:'weapon'|'armor', weaponId|armorId, mesh, taken }
-  enemies: [],          // patrolling AI
-  lootedWeapons: [],    // weapons picked up this match
-  lootedArmor: [],      // armor picked up this match
+  lootItems: [],
+  enemies: [],
+  lootedWeapons: [],
+  lootedArmor: [],
+  lootedValuables: [],
   coinsThisMatch: 0,
   dead: false,
   extracting: false,
@@ -3182,14 +3170,48 @@ const MAX_EXTRACTION_ENEMIES = 8;
 const EXTRACT_TIME_REQUIRED = 3; // seconds
 // ================= CHESTS =================
 const CHEST_RARITY = {
-  common:    { color: 0x8a8a8a, edge: 0x555555, label: 'COMMON',    openTime: 1.2,
-               weapons: ['m16','mp5'], armors: [], coins: [20, 50] },
-  rare:      { color: 0x4a9eff, edge: 0x2255aa, label: 'RARE',      openTime: 2.0,
-               weapons: ['ak47','m1916','mp5','scar'], armors: ['light'], coins: [50, 150] },
-  epic:      { color: 0xaa66ff, edge: 0x6633aa, label: 'EPIC',      openTime: 2.8,
-               weapons: ['scar','minigun','awp'], armors: ['light','heavy'], coins: [120, 300] },
-  legendary: { color: 0xffd94a, edge: 0xaa8800, label: 'LEGENDARY', openTime: 3.5,
-               weapons: ['awp','minigun'], armors: ['heavy'], coins: [300, 600] },
+  common: {
+    color: 0x8a8a8a, edge: 0x555555, label: 'COMMON', openTime: 1.2,
+    rollCount: [1, 2],
+    nothingChance: 0.15,
+    weaponWeights:  { m16: 40, mp5: 40, ak47: 15, m1916: 5 },
+    armorWeights:   { light: 100 },
+    valuableWeights:{ scrap: 40, ration: 30, apple: 20, hard_drive: 8, radio_part: 2 },
+    valuableChance: 0.35,
+    coins: [20, 60],
+  },
+  rare: {
+    color: 0x4a9eff, edge: 0x2255aa, label: 'RARE', openTime: 2.0,
+    rollCount: [2, 3],
+    nothingChance: 0.08,
+    weaponWeights:  { mp5: 30, ak47: 30, m1916: 20, scar: 15, minigun: 4, awp: 1 },
+    armorWeights:   { light: 85, heavy: 15 },
+    valuableWeights:{ hard_drive: 35, radio_part: 30, gold_ring: 20, gold_bar: 10, battery_cell: 5 },
+    valuableChance: 0.55,
+    coins: [60, 160],
+  },
+  epic: {
+    color: 0xaa66ff, edge: 0x6633aa, label: 'EPIC', openTime: 2.8,
+    rollCount: [2, 4],
+    nothingChance: 0.04,
+    weaponWeights:  { scar: 30, minigun: 25, awp: 15, m1916: 15, ak47: 15 },
+    armorWeights:   { light: 50, heavy: 50 },
+    valuableWeights:{ gold_ring: 25, gold_bar: 30, battery_cell: 30, radio_part: 15 },
+    valuableChance: 0.65,
+    coins: [140, 320],
+  },
+  legendary: {
+    color: 0xffd94a, edge: 0xaa8800, label: 'LEGENDARY', openTime: 3.5,
+    rollCount: [3, 5],
+    nothingChance: 0.02,
+    weaponWeights:  { awp: 35, minigun: 35, scar: 20, m1916: 10 },
+    armorWeights:   { heavy: 100 },
+    valuableWeights:{ gold_bar: 30, battery_cell: 25, gold_ring: 33 },
+    valuableChance: 0.85,
+    coins: [300, 700],
+    guaranteedWeapon: ['awp', 'minigun'],
+    jackpot: { id: 'star_of_africa', chance: 0.02 },  // 1 in 50
+  },
 };
 const lootChests = [];     // { mesh, ring, rarity, x, z, opened, opening, openT }
 let nearestChest = null;
@@ -3551,12 +3573,18 @@ function killExtractionEnemy(e) {
 // ================= LOOT SYSTEM =================
 let lootIdCounter = 0;
 function spawnLoot(pos, kind, id) {
-  const geo = kind === 'weapon'
-    ? new THREE.BoxGeometry(0.5, 0.5, 0.5)
-    : new THREE.BoxGeometry(0.55, 0.4, 0.55);
-  const mat = kind === 'weapon'
-    ? new THREE.MeshLambertMaterial({ color: 0xffd94a, emissive: 0x664400 })
-    : new THREE.MeshLambertMaterial({ color: 0x4aa0ff, emissive: 0x114488 });
+  let geo, color, emissive;
+  if (kind === 'weapon') {
+    geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+    color = 0xffd94a; emissive = 0x664400;
+  } else if (kind === 'armor') {
+    geo = new THREE.BoxGeometry(0.55, 0.4, 0.55);
+    color = 0x4aa0ff; emissive = 0x114488;
+  } else {
+    geo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+    color = 0xaa66ff; emissive = 0x553388;
+  }
+  const mat = new THREE.MeshLambertMaterial({ color: color, emissive: emissive });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.copy(pos);
   mesh.position.y = 0.4;
@@ -3565,7 +3593,7 @@ function spawnLoot(pos, kind, id) {
   // Glow ring on floor
   const ringGeo = new THREE.RingGeometry(0.8, 1.1, 20);
   const ringMat = new THREE.MeshBasicMaterial({
-    color: kind === 'weapon' ? 0xffd94a : 0x4aa0ff,
+    color: color,
     side: THREE.DoubleSide, transparent: true, opacity: 0.5
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -3607,45 +3635,115 @@ function nearestLoot(maxDist) {
 function spawnChest(x, z, rarity) {
   const cfg = CHEST_RARITY[rarity];
   if (!cfg) return;
+
+  const W = 1.0, H = 0.62, D = 0.72;      // body dims (wider than tall, like a footlocker)
+  const LID_H = 0.14;
+  const LEG_H = 0.06;
+
   const g = new THREE.Group();
-  const box = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 1.0),
-    new THREE.MeshLambertMaterial({ color: cfg.color }));
-  box.position.y = 0.5; box.castShadow = true; box.receiveShadow = true;
-  g.add(box);
-  // Lid (thin plate on top)
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.12, 1.05),
-    new THREE.MeshLambertMaterial({ color: cfg.edge }));
-  lid.position.y = 1.06; lid.castShadow = true; g.add(lid);
-  // Horizontal edge trim
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.12, 1.02),
-    new THREE.MeshLambertMaterial({ color: cfg.edge }));
-  trim.position.y = 0.5; g.add(trim);
-  // Glowing ring on floor
-  const ringGeo = new THREE.RingGeometry(1.3, 1.6, 28);
+
+  // --- Materials ---
+  const darkMetal = new THREE.MeshLambertMaterial({ color: 0x2a2d31 });
+  const midMetal  = new THREE.MeshLambertMaterial({ color: 0x3c4046 });
+  const rarityMat = new THREE.MeshLambertMaterial({
+    color: cfg.color, emissive: cfg.edge, emissiveIntensity: 0.35
+  });
+  const lockGlow  = new THREE.MeshBasicMaterial({ color: cfg.color });
+
+  // --- Feet (4 small blocks) ---
+  const footGeo = new THREE.BoxGeometry(0.14, LEG_H, 0.14);
+  [[-W/2+0.12, -D/2+0.12], [W/2-0.12, -D/2+0.12],
+   [-W/2+0.12,  D/2-0.12], [W/2-0.12,  D/2-0.12]].forEach(function(p) {
+    const f = new THREE.Mesh(footGeo, darkMetal);
+    f.position.set(p[0], LEG_H/2, p[1]);
+    f.castShadow = true; g.add(f);
+  });
+
+  // --- Body ---
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), midMetal);
+  body.position.y = LEG_H + H/2;
+  body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+
+  // --- Corner reinforcements (4 vertical strips) ---
+  const stripGeo = new THREE.BoxGeometry(0.08, H + 0.01, 0.08);
+  [[-W/2+0.04, -D/2+0.04], [W/2-0.04, -D/2+0.04],
+   [-W/2+0.04,  D/2-0.04], [W/2-0.04,  D/2-0.04]].forEach(function(p) {
+    const s = new THREE.Mesh(stripGeo, darkMetal);
+    s.position.set(p[0], LEG_H + H/2, p[1]);
+    g.add(s);
+  });
+
+  // --- Horizontal rarity band around the middle ---
+  const bandGeo = new THREE.BoxGeometry(W + 0.02, 0.10, D + 0.02);
+  const band = new THREE.Mesh(bandGeo, rarityMat);
+  band.position.y = LEG_H + H * 0.55;
+  band.castShadow = true;
+  g.add(band);
+
+  // --- Front lock plate (rarity colored, small) ---
+  const lockGeo = new THREE.BoxGeometry(0.14, 0.18, 0.04);
+  const lock = new THREE.Mesh(lockGeo, lockGlow);
+  lock.position.set(0, LEG_H + H * 0.55, D/2 + 0.02);
+  g.add(lock);
+
+  // --- Lid pivot group (hinges at back edge) ---
+  const lidPivot = new THREE.Group();
+  lidPivot.position.set(0, LEG_H + H, -D/2);   // hinge at back-top
+  g.add(lidPivot);
+
+  const lidBody = new THREE.Mesh(
+    new THREE.BoxGeometry(W + 0.04, LID_H, D + 0.04),
+    midMetal
+  );
+  lidBody.position.set(0, LID_H/2, D/2);
+  lidBody.castShadow = true;
+  lidPivot.add(lidBody);
+
+  // Lid top corner bumps
+  const lidCornerGeo = new THREE.BoxGeometry(0.14, LID_H + 0.02, 0.14);
+  [[-W/2+0.07, -D/2+0.07], [W/2-0.07, -D/2+0.07],
+   [-W/2+0.07,  D/2-0.07], [W/2-0.07,  D/2-0.07]].forEach(function(p) {
+    const c = new THREE.Mesh(lidCornerGeo, darkMetal);
+    c.position.set(p[0], LID_H/2, p[1] + D/2);
+    lidPivot.add(c);
+  });
+
+  // Thin rarity accent line along the lid's front edge
+  const lidAccent = new THREE.Mesh(
+    new THREE.BoxGeometry(W + 0.04, 0.04, 0.03),
+    rarityMat
+  );
+  lidAccent.position.set(0, LID_H/2, D/2 + D/2 + 0.02);
+  lidPivot.add(lidAccent);
+
+  // --- Floor ring: flat, dim, no pulse ---
+  const ringGeo = new THREE.RingGeometry(0.85, 1.05, 32);
   const ringMat = new THREE.MeshBasicMaterial({
-    color: cfg.color, side: THREE.DoubleSide, transparent: true, opacity: 0.55
+    color: cfg.color, side: THREE.DoubleSide, transparent: true, opacity: 0.28
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(x, 0.05, z);
+  ring.position.y = 0.02;
   g.add(ring);
+
   g.position.set(x, 0, z);
   scene.add(g);
+
   lootChests.push({
-    group: g, box: box, lid: lid, ring: ring,
+    group: g, body: body, lid: lidPivot, ring: ring,
     rarity: rarity, x: x, z: z,
-    opened: false, opening: false, openT: 0, t: Math.random() * 10,
+    opened: false, opening: false, openT: 0, t: 0,
   });
 }
 
 function updateChests(dt) {
   if (!Extraction.active) return;
-  // Bob the lid a tiny bit for unopened chests
+  // Chests sit flat — no bob. Slight breathing glow on the floor ring only.
   for (const c of lootChests) {
     if (c.opened) continue;
     c.t += dt;
-    c.group.position.y = Math.sin(c.t * 1.6) * 0.04;
-    if (c.ring) c.ring.material.opacity = 0.4 + Math.sin(c.t * 3) * 0.18;
+    if (c.ring) c.ring.material.opacity = 0.25 + Math.sin(c.t * 1.5) * 0.06;
   }
   // Find nearest unopened chest
   nearestChest = null;
@@ -3690,6 +3788,57 @@ function startChestOpen(chest) {
   document.getElementById('extractProgressFill').style.width = '0%';
   document.getElementById('extractProgress').classList.add('active');
 }
+function weightedPick(weights) {
+  const keys = Object.keys(weights).filter(function(k) { return weights[k] > 0; });
+  if (keys.length === 0) return null;
+  let total = 0;
+  for (const k of keys) total += weights[k];
+  let r = Math.random() * total;
+  for (const k of keys) { r -= weights[k]; if (r <= 0) return k; }
+  return keys[keys.length - 1];
+}
+
+function rollChestLoot(cfg) {
+  const drops = [];
+
+  // Jackpot roll — independent of normal loot rolls (legendary: 1 in 50)
+  if (cfg.jackpot && Math.random() < cfg.jackpot.chance) {
+    drops.push({ kind: 'valuable', id: cfg.jackpot.id, jackpot: true });
+  }
+
+  // Guaranteed weapon first (legendary)
+  if (cfg.guaranteedWeapon && cfg.guaranteedWeapon.length > 0) {
+    const w = cfg.guaranteedWeapon[Math.floor(Math.random() * cfg.guaranteedWeapon.length)];
+    drops.push({ kind: 'weapon', id: w });
+  }
+
+  // Bonus rolls
+  const rolls = cfg.rollCount[0] + Math.floor(Math.random() * (cfg.rollCount[1] - cfg.rollCount[0] + 1));
+  for (let i = 0; i < rolls; i++) {
+    if (Math.random() < (cfg.nothingChance || 0)) continue;
+
+    // Slot decision: 60% weapon, 25% valuable, 15% armor
+    const slot = Math.random();
+    if (slot < 0.60) {
+      const w = weightedPick(cfg.weaponWeights);
+      if (w) drops.push({ kind: 'weapon', id: w });
+    } else if (slot < 0.85) {
+      if (Math.random() < (cfg.valuableChance || 0)) {
+        const v = weightedPick(cfg.valuableWeights);
+        if (v) drops.push({ kind: 'valuable', id: v });
+      } else {
+        // Fallback to weapon if valuable roll missed
+        const w = weightedPick(cfg.weaponWeights);
+        if (w) drops.push({ kind: 'weapon', id: w });
+      }
+    } else {
+      const a = weightedPick(cfg.armorWeights);
+      if (a) drops.push({ kind: 'armor', id: a });
+    }
+  }
+
+  return drops;
+}
 function openChest(chest) {
   if (chest.opened) return;
   chest.opened = true;
@@ -3697,34 +3846,14 @@ function openChest(chest) {
   Audio.pickupChime();
   burst(new THREE.Vector3(chest.x, 0.8, chest.z), cfg.color, 20, 1.4);
 
-  // Visual: swing lid open, dim it
-  chest.box.material.color.multiplyScalar(0.5);
+  // Visual: hinge the lid open around the back edge, kill the ring
   if (chest.lid) {
-    chest.lid.rotation.x = -1.2;
-    chest.lid.position.z = -0.5;
-    chest.lid.position.y = 1.1;
+    chest.lid.rotation.x = -Math.PI * 0.62;   // ~112° open
   }
   if (chest.ring) chest.ring.visible = false;
 
-  // Roll loot: 1-3 items
-  const itemCount = 1 + Math.floor(Math.random() * Math.min(3, cfg.weapons.length + cfg.armors.length));
-  const drops = [];
-  for (let i = 0; i < itemCount; i++) {
-    const roll = Math.random();
-    if (roll < 0.7 || (cfg.armors.length === 0 && cfg.weapons.length > 0)) {
-      // Weapon drop
-      if (cfg.weapons.length > 0) {
-        const w = cfg.weapons[Math.floor(Math.random() * cfg.weapons.length)];
-        drops.push({ kind: 'weapon', id: w });
-      }
-    } else {
-      // Armor drop
-      if (cfg.armors.length > 0) {
-        const a = cfg.armors[Math.floor(Math.random() * cfg.armors.length)];
-        drops.push({ kind: 'armor', id: a });
-      }
-    }
-  }
+  // Roll loot from weighted table
+  const drops = rollChestLoot(cfg);
 
   // Coins
   const coins = cfg.coins[0] + Math.floor(Math.random() * (cfg.coins[1] - cfg.coins[0] + 1));
@@ -3733,19 +3862,26 @@ function openChest(chest) {
 
   // Spawn loot piles around the chest
   const baseAngle = Math.random() * Math.PI * 2;
-  drops.forEach(function(d, i) {
+    drops.forEach(function(d, i) {
     const angle = baseAngle + (i * Math.PI * 2) / Math.max(1, drops.length);
-    const radius = 1.2;
+    const radius = d.jackpot ? 1.6 : 1.2;
     const lx = chest.x + Math.cos(angle) * radius;
     const lz = chest.z + Math.sin(angle) * radius;
-    spawnLoot(new THREE.Vector3(lx, 0, lz), d.kind, d.id);
+    spawnLoot(new THREE.Vector3(lx, 0, lz), d.kind, d.id, { jackpot: !!d.jackpot });
   });
 
   // Toast summary
   let msg = '📦 ' + cfg.label + ' CHEST: ';
   const parts = [];
-  if (drops.length > 0) parts.push(drops.length + ' item' + (drops.length > 1 ? 's' : ''));
+  const nW = drops.filter(function(d) { return d.kind === 'weapon'; }).length;
+  const nA = drops.filter(function(d) { return d.kind === 'armor'; }).length;
+  const nV = drops.filter(function(d) { return d.kind === 'valuable'; }).length;
+  const hasJackpot = drops.some(function(d) { return d.jackpot; });
+  if (nW) parts.push(nW + ' weapon' + (nW > 1 ? 's' : ''));
+  if (nA) parts.push(nA + ' armor');
+  if (nV) parts.push(nV + ' valuable' + (nV > 1 ? 's' : ''));
   parts.push('🪙 +' + coins);
+  if (hasJackpot) msg = '⭐ JACKPOT! ' + msg;
   showToast(msg + parts.join(' · '));
 }
 
@@ -3759,9 +3895,8 @@ function tryPickup() {
     Extraction.lootedWeapons.push(item.itemId);
     Audio.pickupChime();
     showToast('📦 Picked up ' + (WEAPON_INFO[item.itemId] ? WEAPON_INFO[item.itemId].name : item.itemId));
-  } else if (item.kind === 'armor') {
+    } else if (item.kind === 'armor') {
     Extraction.lootedArmor.push(item.itemId);
-    // Apply armor immediately if better than current
     const info = ARMOR_INFO[item.itemId];
     if (info && info.absorb > player.armorMax) {
       player.armorMax = info.absorb;
@@ -3770,6 +3905,11 @@ function tryPickup() {
     }
     Audio.pickupChime();
     showToast('🛡️ Picked up ' + (ARMOR_INFO[item.itemId] ? ARMOR_INFO[item.itemId].name : item.itemId));
+  } else if (item.kind === 'valuable') {
+    Extraction.lootedValuables.push(item.itemId);
+    Audio.pickupChime();
+    const info = VALUABLE_INFO[item.itemId];
+    showToast('💎 ' + (info ? info.name : item.itemId) + (info ? ' · 🪙 ' + info.price : ''));
   }
   return true;
 }
@@ -4759,6 +4899,7 @@ function extractionSuccess() {
     success: true,
     lootedWeapons: Extraction.lootedWeapons.slice(),
     lootedArmor: Extraction.lootedArmor.slice(),
+    lootedValuables: Extraction.lootedValuables.slice(),
     coinsCollected: Extraction.coinsThisMatch,
   };
   submitExtraction(payload, true);
@@ -4774,6 +4915,13 @@ function extractionSuccess() {
     summaryHtml += '✅ Kept ' + Extraction.lootedArmor.length + ' armor:<br>';
     Extraction.lootedArmor.forEach(function(a) {
       summaryHtml += '   • ' + (ARMOR_INFO[a] ? ARMOR_INFO[a].name : a) + '<br>';
+    });
+  }
+  if (Extraction.lootedValuables.length > 0) {
+    summaryHtml += '✅ Kept ' + Extraction.lootedValuables.length + ' valuables:<br>';
+    Extraction.lootedValuables.forEach(function(v) {
+      const info = VALUABLE_INFO[v];
+      summaryHtml += '   • ' + (info ? info.name : v) + (info ? ' (🪙 ' + info.price + ')' : '') + '<br>';
     });
   }
   summaryHtml += '🪙 +' + Extraction.coinsThisMatch + ' coins';
@@ -5173,6 +5321,7 @@ function startExtractionMode() {
   Extraction.finished = false;
   Extraction.lootedWeapons = [];
   Extraction.lootedArmor = [];
+  Extraction.lootedValuables = [];
   Extraction.coinsThisMatch = 0;
   Extraction.lootItems = [];
   Extraction.enemies = [];
