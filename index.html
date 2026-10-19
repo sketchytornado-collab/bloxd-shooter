@@ -963,9 +963,10 @@
   <div style="color:#ffd94a;font-size:13px;margin:20px 0 6px">VALUABLES:</div>
   <div id="valuablesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-width:720px;width:100%;"></div>
 
-  <div id="stashMsg"></div>
     <div style="color:#4bea8b;font-size:13px;margin:20px 0 6px">SELL WEAPONS — click to sell for coins</div>
+  <div id="sellGrid" class="stash-items-grid"></div>
 
+  <div id="stashMsg"></div>
   <button class="closeBtn" id="stashClose">CLOSE</button>
 </div>
 
@@ -1297,7 +1298,7 @@ const VALUABLE_INFO = {
 // ================= SELL PRICES =================
 // What a weapon is worth when you sell it. Usually ~50% of buy price.
 const WEAPON_SELL_PRICE = {
-  m16:     0,      // starter weapon, worthless
+  m16:     50,      // starter weapon, not worthless cause i have mercy
   ak47:    400,
   m1916:   600,
   mp5:     750,
@@ -1800,10 +1801,12 @@ function renderSellGrid() {
       '<div class="si-name">' + info.name + '</div>' +
       '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
       '<div class="si-price">🪙 ' + price + '</div>';
-    if (price <= 0) {
+      if (price <= 0) {
       card.style.opacity = '0.4';
       card.style.cursor = 'default';
+      card.title = 'This weapon cannot be sold.';
     } else {
+      card.title = 'Click to sell for 🪙 ' + price;
       card.addEventListener('click', function() { sellWeapon(id); });
     }
     grid.appendChild(card);
@@ -1828,14 +1831,63 @@ async function sellWeapon(id) {
   const price = WEAPON_SELL_PRICE[id] || 0;
   if (price <= 0) return;
   if (!confirm('Sell ' + WEAPON_INFO[id].name + ' for 🪙 ' + price + '?')) return;
-  try {
-    const data = await apiCall('/api/sell-weapon', { weaponId: id });
-    if (data.user) {
-      Account.user = data.user;
-      showLoggedIn();
-      renderStash();
-      document.getElementById('stashMsg').textContent = '✓ Sold ' + WEAPON_INFO[id].name + ' for ' + price;
+
+  // Try server first
+  if (Account.token) {
+    try {
+      const data = await apiCall('/api/sell-weapon', { weaponId: id });
+      if (data.user) {
+        Account.user = data.user;
+        showLoggedIn();
+        renderStash();
+        document.getElementById('stashMsg').textContent =
+          '✓ Sold ' + WEAPON_INFO[id].name + ' for 🪙 ' + price;
+        return;
+      }
+    } catch (e) {
+      console.warn('server sell failed, using local fallback:', e.message);
     }
+  }
+
+  // Local fallback (works with no backend / offline)
+  try {
+    if (!Account.user) {
+      document.getElementById('stashMsg').textContent = 'Log in to sell weapons.';
+      return;
+    }
+    const stash = (Account.user.stash || []).slice();
+    const owned = (Account.user.ownedWeapons || []).slice();
+    let removed = false;
+
+    // Prefer removing from stash first
+    const si = stash.indexOf(id);
+    if (si >= 0) {
+      stash.splice(si, 1);
+      removed = true;
+    } else {
+      const oi = owned.indexOf(id);
+      // Never remove the last m16 — always keep a starter
+      if (oi >= 0 && !(id === 'm16' && owned.filter(function(w){return w==='m16';}).length <= 1)) {
+        owned.splice(oi, 1);
+        removed = true;
+      }
+    }
+
+    if (!removed) {
+      document.getElementById('stashMsg').textContent =
+        'Cannot sell — that is your only copy of ' + WEAPON_INFO[id].name + '.';
+      return;
+    }
+
+    Account.user.coins = (Account.user.coins || 0) + price;
+    Account.user.stash = stash;
+    Account.user.ownedWeapons = owned;
+    try { localStorage.setItem('bs_user', JSON.stringify(Account.user)); } catch (e) {}
+
+    showLoggedIn();
+    renderStash();
+    document.getElementById('stashMsg').textContent =
+      '✓ Sold ' + WEAPON_INFO[id].name + ' for 🪙 ' + price;
   } catch (e) {
     document.getElementById('stashMsg').textContent = 'Sell failed: ' + e.message;
   }
