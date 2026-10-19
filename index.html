@@ -959,9 +959,12 @@
   <div style="color:#ffd94a;font-size:13px;margin:20px 0 6px">STASHED WEAPONS:</div>
   <div id="stashGrid" class="stash-items-grid"></div>
   <div id="stashDetail" class="stash-detail" style="display:none"></div>
+
+  <div style="color:#ffd94a;font-size:13px;margin:20px 0 6px">VALUABLES:</div>
+  <div id="valuablesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-width:720px;width:100%;"></div>
+
   <div id="stashMsg"></div>
     <div style="color:#4bea8b;font-size:13px;margin:20px 0 6px">SELL WEAPONS — click to sell for coins</div>
-  <div id="sellGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-width:720px;width:100%;"></div>
 
   <button class="closeBtn" id="stashClose">CLOSE</button>
 </div>
@@ -1171,6 +1174,124 @@ const ARMOR_TIER = {
   none:  'common',
   light: 'common',
   heavy: 'rare',
+};
+
+// ================= PIXEL VALUABLE ICONS =================
+// Each function draws a 16x16 pixel-art icon on a canvas
+const VALUABLE_ICON_DRAWERS = {
+  scrap: function(g) {
+    // Grey jagged scrap chunk
+    g.fillStyle = '#3a3a3a'; g.fillRect(3, 4, 10, 9);
+    g.fillStyle = '#7a7a7a';
+    g.fillRect(4, 5, 8, 2); g.fillRect(4, 7, 3, 5); g.fillRect(9, 7, 3, 4);
+    g.fillStyle = '#aaa'; g.fillRect(5, 4, 3, 1); g.fillRect(8, 6, 2, 1);
+    g.fillStyle = '#222'; g.fillRect(6, 9, 2, 3);
+  },
+  ration: function(g) {
+    // Beige can with red band
+    g.fillStyle = '#b8a888'; g.fillRect(4, 3, 8, 11);
+    g.fillStyle = '#e8d8b8'; g.fillRect(4, 3, 8, 2);
+    g.fillStyle = '#8a2a2a'; g.fillRect(4, 7, 8, 4);
+    g.fillStyle = '#fff'; g.fillRect(6, 8, 4, 2);
+    g.fillStyle = '#666'; g.fillRect(4, 13, 8, 1);
+  },
+  apple: function(g) {
+    // Red apple with green stem + leaf
+    g.fillStyle = '#8a1a1a'; g.fillRect(5, 5, 6, 7);
+    g.fillStyle = '#c83a3a';
+    g.fillRect(5, 6, 6, 5); g.fillRect(6, 5, 4, 7);
+    g.fillStyle = '#e85a5a'; g.fillRect(6, 6, 2, 2);
+    g.fillStyle = '#3a2a1a'; g.fillRect(7, 2, 2, 3);
+    g.fillStyle = '#4a8a2a'; g.fillRect(9, 2, 3, 2);
+  },
+  hard_drive: function(g) {
+    // Grey box with blue data strips
+    g.fillStyle = '#4a4a4a'; g.fillRect(2, 4, 12, 8);
+    g.fillStyle = '#7a7a7a'; g.fillRect(3, 5, 10, 6);
+    g.fillStyle = '#2a2a2a'; g.fillRect(3, 6, 7, 1); g.fillRect(3, 8, 5, 1);
+    g.fillStyle = '#4a9eff'; g.fillRect(11, 6, 2, 1); g.fillRect(11, 8, 2, 1);
+    g.fillStyle = '#8a8a8a'; g.fillRect(2, 12, 12, 2);
+  },
+  radio_part: function(g) {
+    // Green circuit board with copper contacts
+    g.fillStyle = '#2a4a2a'; g.fillRect(2, 3, 12, 10);
+    g.fillStyle = '#4a6a4a'; g.fillRect(3, 4, 10, 8);
+    g.fillStyle = '#c87a3a'; g.fillRect(4, 5, 2, 2); g.fillRect(10, 5, 2, 2);
+    g.fillRect(4, 10, 2, 2); g.fillRect(10, 10, 2, 2);
+    g.fillStyle = '#8adc8a'; g.fillRect(7, 7, 2, 2);
+    g.fillStyle = '#1a2a1a'; g.fillRect(4, 8, 3, 1); g.fillRect(9, 8, 3, 1);
+  },
+  gold_ring: function(g) {
+    // Gold ring with gem
+    g.fillStyle = '#aa8830'; 
+    g.fillRect(4, 4, 8, 2); g.fillRect(4, 10, 8, 2);
+    g.fillRect(3, 6, 2, 4); g.fillRect(11, 6, 2, 4);
+    g.fillStyle = '#ffd94a';
+    g.fillRect(5, 5, 6, 1); g.fillRect(5, 10, 6, 1);
+    g.fillRect(4, 7, 1, 2); g.fillRect(11, 7, 1, 2);
+    g.fillStyle = '#4a9eff'; g.fillRect(7, 5, 2, 2); // gem
+    g.fillStyle = '#aadcff'; g.fillRect(7, 5, 1, 1);
+  },
+  gold_bar: function(g) {
+    // Stacked gold bars
+    g.fillStyle = '#8a6820'; g.fillRect(2, 9, 12, 4);
+    g.fillStyle = '#ffd94a'; g.fillRect(3, 10, 10, 2);
+    g.fillStyle = '#aa8830'; g.fillRect(3, 5, 10, 4);
+    g.fillStyle = '#ffd94a'; g.fillRect(4, 6, 8, 2);
+    g.fillStyle = '#fff4b0'; g.fillRect(5, 6, 3, 1); g.fillRect(4, 10, 2, 1);
+  },
+  battery_cell: function(g) {
+    // Green battery with yellow flash
+    g.fillStyle = '#2a3a2a'; g.fillRect(4, 3, 8, 11);
+    g.fillStyle = '#4a6a4a'; g.fillRect(5, 4, 6, 9);
+    g.fillStyle = '#1a2a1a'; g.fillRect(6, 2, 4, 1);
+    g.fillStyle = '#ffd94a';
+    g.fillRect(7, 5, 2, 2); g.fillRect(6, 7, 2, 2); g.fillRect(8, 9, 2, 2); g.fillRect(7, 11, 2, 1);
+  },
+  star_of_africa: function(g) {
+    // Six-pointed diamond star, gold + white
+    g.fillStyle = '#aa8830';
+    g.fillRect(6, 1, 4, 14); g.fillRect(1, 6, 14, 4);
+    g.fillStyle = '#ffd94a';
+    g.fillRect(7, 1, 2, 14); g.fillRect(1, 7, 14, 2);
+    g.fillRect(5, 3, 6, 10); g.fillRect(3, 5, 10, 6);
+    g.fillStyle = '#ffffff';
+    g.fillRect(7, 5, 2, 6); g.fillRect(5, 7, 6, 2);
+    g.fillStyle = '#aadcff';
+    g.fillRect(7, 7, 2, 2);
+  },
+};
+
+function makeValuableIcon(valuableId, size) {
+  size = size || 48;
+  const c = document.createElement('canvas');
+  // Draw at 16x16 then scale up with nearest-neighbor
+  c.width = 16; c.height = 16;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const draw = VALUABLE_ICON_DRAWERS[valuableId];
+  if (draw) draw(g);
+  // Scale up by drawing onto a larger canvas with imageSmoothing off
+  const big = document.createElement('canvas');
+  big.width = size; big.height = size;
+  const bg = big.getContext('2d');
+  bg.imageSmoothingEnabled = false;
+  bg.drawImage(c, 0, 0, 16, 16, 0, 0, size, size);
+  return big;
+}
+
+// ================= VALUABLES =================
+// Text icons (no emoji) — displayed as short tags
+const VALUABLE_INFO = {
+  scrap:          { name: 'Scrap Metal',    price: 30,   tier: 'common'    },
+  ration:         { name: 'Ration Can',     price: 50,   tier: 'common'    },
+  apple:          { name: 'Apple',          price: 40,   tier: 'common'    },
+  hard_drive:     { name: 'Hard Drive',     price: 200,  tier: 'rare'      },
+  radio_part:     { name: 'Radio Part',     price: 250,  tier: 'rare'      },
+  gold_ring:      { name: 'Gold Ring',      price: 350,  tier: 'rare'      },
+  gold_bar:       { name: 'Gold Bar',       price: 800,  tier: 'epic'      },
+  battery_cell:   { name: 'Battery Cell',   price: 600,  tier: 'epic'      },
+  star_of_africa: { name: 'Star of Africa', price: 3000, tier: 'legendary' },
 };
 
 // ================= SELL PRICES =================
@@ -1599,6 +1720,37 @@ function renderStash() {
       stashGrid.appendChild(card);
     });
   }
+  // Valuables grid — text-icon cards, colored by tier
+  const valGrid = document.getElementById('valuablesGrid');
+  if (valGrid) {
+    valGrid.innerHTML = '';
+    const valuables = Account.user.valuables || [];
+    if (valuables.length === 0) {
+      valGrid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;grid-column:1/-1;text-align:center">No valuables yet. Open chests in Extraction to find trinkets.</div>';
+    } else {
+      valuables.forEach(function(id) {
+        const info = VALUABLE_INFO[id]; if (!info) return;
+        const rarity = RARITY[info.tier] || RARITY.common;
+        const card = document.createElement('div');
+        card.className = 'stash-item tier-' + info.tier;
+        card.style.cursor = 'pointer';
+        card.innerHTML =
+          '<div class="si-stripe"></div>' +
+          '<div class="si-icon" style="padding:10px 0;"></div>' +
+          '<div class="si-name">' + info.name + '</div>' +
+          '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
+          '<div class="si-price">🪙 ' + info.price + '</div>';
+        const iconSlot = card.querySelector('.si-icon');
+        iconSlot.appendChild(makeValuableIcon(id, 48));
+        card.addEventListener('click', function() {
+          if (confirm('Sell ' + info.name + ' for 🪙 ' + info.price + '?')) {
+            sellValuable(id);
+          }
+        });
+        valGrid.appendChild(card);
+      });
+    }
+  }
 
   renderSellGrid();
 }
@@ -1657,7 +1809,20 @@ function renderSellGrid() {
     grid.appendChild(card);
   });
 }
-
+async function sellValuable(id) {
+  const info = VALUABLE_INFO[id]; if (!info) return;
+  try {
+    const data = await apiCall('/api/sell-valuable', { valuableId: id });
+    if (data.user) {
+      Account.user = data.user;
+      showLoggedIn();
+      renderStash();
+      document.getElementById('stashMsg').textContent = '✓ Sold ' + info.name + ' for ' + info.price;
+    }
+  } catch (e) {
+    document.getElementById('stashMsg').textContent = 'Sell failed: ' + e.message;
+  }
+}
 
 async function sellWeapon(id) {
   const price = WEAPON_SELL_PRICE[id] || 0;
