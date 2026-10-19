@@ -71,6 +71,7 @@ function makeUser(username, password) {
     ownedArmor: isAdmin ? 'light,heavy' : '',                         // armor ids you've extracted
     extractionWins: isAdmin ? 100 : 0,
     extractionLosses: 0,
+    operator: 'assault',
     rank: 'Recruit',
     isBanned: 'false',
     isAdmin: isAdmin ? 'true' : 'false',
@@ -99,6 +100,7 @@ function publicUser(u) {
     ownedArmor: ownedArmor,
     extractionWins: Number(u.extractionWins) || 0,
     extractionLosses: Number(u.extractionLosses) || 0,
+    operator: u.operator || 'assault',
     rank: u.rank || 'Recruit',
     last_save: u.lastSave ? Number(u.lastSave) : null,
     isAdmin: u.isAdmin === 'true' || u.isAdmin === true,
@@ -121,6 +123,7 @@ async function getUser(username) {
   if (data.ownedArmor === undefined) data.ownedArmor = '';
   if (data.extractionWins === undefined) data.extractionWins = '0';
   if (data.extractionLosses === undefined) data.extractionLosses = '0';
+  if (data.operator === undefined) data.operator = 'assault';
   return data;
 }
 async function saveUser(user) {
@@ -386,6 +389,19 @@ const routes = {
     user.lastSeen = String(Date.now());
     await saveUser(user);
     sendJSON(res, 200, { success: true, ownedPacks: filtered });
+  },
+  // ---- set operator ----
+  'POST /api/set-operator': async (req, res) => {
+    const user = await authUser(req);
+    if (!user) return sendJSON(res, 401, { success: false, error: 'Not authenticated' });
+    const body = await readBody(req);
+    const op = String(body.operator || '').toLowerCase();
+    const valid = ['assault', 'recon', 'support', 'engineer'];
+    if (!valid.includes(op)) return sendJSON(res, 400, { success: false, error: 'Unknown operator' });
+    user.operator = op;
+    user.lastSeen = String(Date.now());
+    await saveUser(user);
+    sendJSON(res, 200, { success: true, operator: op });
   },
 
   // ---- save safe box (2 slots) ----
