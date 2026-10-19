@@ -2289,24 +2289,13 @@ MAPS.extraction.lootSpawns = [
   { cx: 40, cz: 20, weapon: 'scar' },
 ];
 
-MAPS.extraction.chests = [
-  // Rarity, cx, cz — placed around warehouses, office, and towers
-  { cx: 11, cz: 10, rarity: 'common' },
-  { cx: 18, cz: 10, rarity: 'common' },
-  { cx: 45, cz: 10, rarity: 'common' },
-  { cx: 50, cz: 10, rarity: 'rare' },
-  { cx: 11, cz: 46, rarity: 'rare' },
-  { cx: 18, cz: 46, rarity: 'common' },
-  { cx: 45, cz: 46, rarity: 'common' },
-  { cx: 50, cz: 46, rarity: 'rare' },
-  // Office building
-  { cx: 27, cz: 30, rarity: 'epic' },
-  { cx: 33, cz: 30, rarity: 'epic' },
-  { cx: 30, cz: 27, rarity: 'legendary' },
-  // Watchtowers
-  { cx: 3, cz: 6, rarity: 'epic' },
-  { cx: 56, cz: 56, rarity: 'legendary' },
-];
+// Chests are spawned randomly each raid. Exactly 3 per raid.
+MAPS.extraction.chestConfig = {
+  countMin: 3,
+  countMax: 3,
+  weights: { common: 50, rare: 30, epic: 15, legendary: 5 },
+};
+
 MAPS.extraction.armorSpawns = [
   { cx: 15, cz: 15, armor: 'light' },
   { cx: 45, cz: 15, armor: 'light' },
@@ -5180,11 +5169,39 @@ function startExtractionMode() {
       spawnLoot(new THREE.Vector3(ls.cx * TILE, 0, ls.cz * TILE), 'armor', ls.armor);
     });
   }
-  // Spawn chests
-  if (currentMapDef.chests) {
-    currentMapDef.chests.forEach(function(ch) {
-      spawnChest(ch.cx * TILE, ch.cz * TILE, ch.rarity);
+   // Spawn chests — 3 random positions, weighted rarity
+  if (currentMapDef.chestConfig) {
+    const cfg = currentMapDef.chestConfig;
+    const count = cfg.countMin + Math.floor(Math.random() * (cfg.countMax - cfg.countMin + 1));
+    const pool = [];
+    Object.keys(cfg.weights).forEach(function(r) {
+      for (let i = 0; i < cfg.weights[r]; i++) pool.push(r);
     });
+    const placed = [];
+    let attempts = 0;
+    while (placed.length < count && attempts < 500) {
+      attempts++;
+      const pos = randomOpenPos(TILE * 2);
+      let ok = true;
+      // Keep away from extraction zones
+      if (currentMapDef.extractionZones) {
+        for (const ez of currentMapDef.extractionZones) {
+          if (Math.hypot(pos.x - ez.cx * TILE, pos.z - ez.cz * TILE) < 8) { ok = false; break; }
+        }
+      }
+      // Keep chests apart from each other
+      if (ok) {
+        for (const p of placed) {
+          if (Math.hypot(pos.x - p.x, pos.z - p.z) < 10) { ok = false; break; }
+        }
+      }
+      // Keep away from player spawn
+      if (ok && Math.hypot(pos.x - TILE * 3, pos.z - TILE * 3) < TILE * 4) ok = false;
+      if (!ok) continue;
+      const rarity = pool[Math.floor(Math.random() * pool.length)];
+      spawnChest(pos.x, pos.z, rarity);
+      placed.push({ x: pos.x, z: pos.z });
+    }
   }
 
   // Spawn scavengers
