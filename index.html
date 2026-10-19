@@ -558,6 +558,10 @@
   #btnInteract { right: 30px; width: 66px; height: 66px; font-size: 11px;
                  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 220px); display: none; }
   #btnInteract.active { display: flex; }
+  #btnAbility { right: 100px; width: 66px; height: 66px; font-size: 16px;
+                bottom: calc(max(30px, env(safe-area-inset-bottom)) + 220px);
+                background: rgba(50,90,140,0.75);
+                border-color: rgba(120,200,255,0.8); }
 
   #menu {
     position: fixed; inset: 0; z-index: 90; display: none; flex-direction: column;
@@ -835,7 +839,29 @@
       <div class="desc">Touch controls</div>
     </div>
   </div>
-
+  <h2>OPERATOR</h2>
+  <div class="row" id="operatorRow">
+    <div class="optBtn" data-op="assault" style="width:150px;height:110px">
+      <div class="big">🎯</div>
+      <div class="label">ASSAULT</div>
+      <div class="desc">+15% fire rate · Sprint</div>
+    </div>
+    <div class="optBtn" data-op="recon" style="width:150px;height:110px">
+      <div class="big">👁️</div>
+      <div class="label">RECON</div>
+      <div class="desc">2× radar · Pulse</div>
+    </div>
+    <div class="optBtn" data-op="support" style="width:150px;height:110px">
+      <div class="big">💉</div>
+      <div class="label">SUPPORT</div>
+      <div class="desc">+30% armor · Med-kit</div>
+    </div>
+    <div class="optBtn" data-op="engineer" style="width:150px;height:110px">
+      <div class="big">🔧</div>
+      <div class="label">ENGINEER</div>
+      <div class="desc">+1 grenade · Turret</div>
+    </div>
+  </div>
   <h2>GAME MODE</h2>
   <div class="row" id="modeRow">
     <div class="optBtn selected" data-mode="extraction" style="width:180px">
@@ -855,8 +881,8 @@
     </div>
   </div>
 
-  <h2>MAP</h2>
-  <div class="row" id="mapRow">
+  <h2 id="mapHeading" style="display:none">MAP</h2>
+  <div class="row" id="mapRow" style="display:none">
     <div class="optBtn mapBtn" data-map="field">
       <div class="mapPreview">🌾</div>
       <div class="label">OPEN FIELD</div>
@@ -871,16 +897,6 @@
       <div class="mapPreview">🏜️</div>
       <div class="label">DESERT BASE</div>
       <div class="desc">Sand, sandstone, military</div>
-    </div>
-    <div class="optBtn mapBtn" data-map="frontline">
-      <div class="mapPreview">⚔️</div>
-      <div class="label">FRONTLINE</div>
-      <div class="desc">Big 50×50 war map</div>
-    </div>
-    <div class="optBtn mapBtn selected" data-map="extraction">
-      <div class="mapPreview">💰</div>
-      <div class="label">EXTRACTION</div>
-      <div class="desc">Industrial compound</div>
     </div>
   </div>
 
@@ -1043,6 +1059,18 @@
 <div id="crosshair"></div>
 <canvas id="minimap" width="200" height="200"></canvas>
 <div id="zoomVignette"></div>
+<div id="abilityHud" style="position:fixed;left:18px;top:calc(170px + env(safe-area-inset-top));z-index:60;pointer-events:none;display:none;font:bold 12px monospace;color:#fff;text-shadow:1px 1px 2px #000;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div id="abilityIcon" style="width:38px;height:38px;border-radius:50%;background:rgba(20,30,50,0.85);border:2px solid #4a9eff;display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;overflow:hidden;">
+      <span id="abilityIconGlyph">F</span>
+      <div id="abilityCooldownFill" style="position:absolute;left:0;right:0;bottom:0;background:rgba(74,158,255,0.5);height:0%;transition:height 0.1s linear;"></div>
+    </div>
+    <div>
+      <div id="abilityName" style="color:#8cf;letter-spacing:1px;">ABILITY</div>
+      <div id="abilityStatus" style="color:#aab;font-size:10px;">READY (F)</div>
+    </div>
+  </div>
+</div>
 
 <div id="hotbar">
   <div class="slot" id="slot-0"><span class="num">1</span><div class="icon">—</div><div class="name">—</div><span class="ammo"></span></div>
@@ -1056,6 +1084,7 @@
   <div class="mBtn" id="btnFire">FIRE</div>
   <div class="mBtn" id="btnJump">JUMP</div>
   <div class="mBtn" id="btnSwap">SWAP</div>
+  <div class="mBtn" id="btnAbility">F</div>
   <div class="mBtn" id="btnInteract">USE</div>
 </div>
 
@@ -1185,11 +1214,19 @@ const FRONTLINE_PACKS = {
   phantom:     { name: 'PHANTOM',     rarity: 'epic',      weapons: ['ak47', 'mp5', 'grenade'],      price: 1100 },
   juggernaut:  { name: 'JUGGERNAUT',  rarity: 'legendary', weapons: ['minigun', 'ak47', 'grenade'],  price: 2000 },
 };
+// ================= OPERATORS =================
+const OPERATORS = {
+  assault:  { name: 'ASSAULT',  icon: '🎯', ability: 'SPRINT',  cooldown: 20 },
+  recon:    { name: 'RECON',    icon: '👁️', ability: 'PULSE',   cooldown: 25 },
+  support:  { name: 'SUPPORT',  icon: '💉', ability: 'MED-KIT', cooldown: 20 },
+  engineer: { name: 'ENGINEER', icon: '🔧', ability: 'TURRET',  cooldown: 30 },
+};
 
 // ================= ACCOUNT STATE =================
 const Account = {
   token: localStorage.getItem('bs_token') || null,
   user: null,
+  operator: localStorage.getItem('bs_operator') || 'assault',
   currentLoadout: (function() {
     try { const s = localStorage.getItem('bs_loadout'); if (s) return JSON.parse(s); } catch (e) {}
     return ['m16', 'grenade'];
@@ -1209,6 +1246,18 @@ if (!Account.ownedPacks || Account.ownedPacks.length === 0) Account.ownedPacks =
 if (!Account.extractionLoadout || Account.extractionLoadout.length === 0) Account.extractionLoadout = ['m16', 'grenade'];
 
 function authHeaders() { return Account.token ? { 'Authorization': 'Bearer ' + Account.token } : {}; }
+async function setOperator(op) {
+  if (!OPERATORS[op]) return;
+  Account.operator = op;
+  localStorage.setItem('bs_operator', op);
+  document.querySelectorAll('#operatorRow .optBtn').forEach(function(b) {
+    b.classList.toggle('selected', b.dataset.op === op);
+  });
+  if (Account.token) {
+    try { await apiCall('/api/set-operator', { operator: op }); } catch (e) {}
+  }
+}
+
 async function apiCall(path, body) {
   const opts = { method: body ? 'POST' : 'GET', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()) };
   if (body) opts.body = JSON.stringify(body);
@@ -1227,6 +1276,13 @@ function showLoggedIn() {
   document.getElementById('loggedInGames').textContent = Account.user.gamesPlayed || 0;
   document.getElementById('loggedInStash').textContent = (Account.user.stash ? Account.user.stash.length : 0) + ' weapons';
   document.getElementById('loggedInExtracts').textContent = (Account.user.extractionWins || 0) + ' W / ' + (Account.user.extractionLosses || 0) + ' L';
+  if (Account.user.operator && OPERATORS[Account.user.operator]) {
+    Account.operator = Account.user.operator;
+    localStorage.setItem('bs_operator', Account.operator);
+  }
+  document.querySelectorAll('#operatorRow .optBtn').forEach(function(b) {
+    b.classList.toggle('selected', b.dataset.op === Account.operator);
+  });
   if (Array.isArray(Account.user.ownedPacks)) {
     Account.ownedPacks = Account.user.ownedPacks.slice();
     if (!Account.ownedPacks.includes('rifleman')) Account.ownedPacks.push('rifleman');
@@ -2547,6 +2603,12 @@ const player = {
   armorMax: 0,
 };
 const GRAVITY = 30, JUMP_VELOCITY = 11;
+// Operator ability runtime state
+player.operator = 'assault';
+player.abilityT = 0;       // remaining cooldown in seconds
+player.sprintT = 0;        // assault active timer
+player.reconPulseT = 0;    // recon pulse active timer
+player.turrets = [];       // engineer turrets
 
 // ================= NAMETAGS =================
 function makeNametag(text, color) {
@@ -2713,6 +2775,132 @@ let minigunSpin = 0;
 
 function getActiveWeaponId() { return activeLoadout[currentWeapon]; }
 function getActiveWeaponStats() { return WEAPON_STATS[getActiveWeaponId()]; }
+function applyOperatorPassives() {
+  player.operator = Account.operator || 'assault';
+  player.abilityT = 0;
+  player.sprintT = 0;
+  player.reconPulseT = 0;
+  if (!player.turrets) player.turrets = [];
+  updateAbilityHud();
+}
+function useAbility() {
+  if (!running) return;
+  if (Frontline.dead || Extraction.dead || Extraction.finished) return;
+  if (player.abilityT > 0) return;
+  const op = player.operator || 'assault';
+  const cfg = OPERATORS[op];
+  if (!cfg) return;
+
+  if (op === 'support') {
+    const before = player.hp;
+    player.hp = Math.min(100, player.hp + 40);
+    const healed = Math.round(player.hp - before);
+    document.getElementById('hpfill').style.width = Math.max(0, player.hp) + '%';
+    Audio.pickupChime();
+    showToast(healed > 0 ? '💉 +' + healed + ' HP' : '💉 HP already full');
+  } else if (op === 'assault') {
+    player.sprintT = 3;
+    showToast('⚡ SPRINT — 3s');
+  } else if (op === 'engineer') {
+    deployTurret();
+    showToast('🔧 Turret deployed');
+  } else if (op === 'recon') {
+    player.reconPulseT = 3;
+    showToast('👁️ PULSE — enemies revealed 3s');
+  } else {
+    // Other operators — Phase 5-7
+    showToast('⚡ ' + cfg.ability + ' (ready)');
+  }
+
+  player.abilityT = cfg.cooldown;
+  updateAbilityHud();
+}
+// Recon pulse: red glow sprites above enemies, visible through walls
+const pulseSprites = [];
+function clearPulseSprites() {
+  for (const s of pulseSprites) scene.remove(s);
+  pulseSprites.length = 0;
+}
+function updateReconPulse() {
+  // Clear existing
+  clearPulseSprites();
+  if (player.reconPulseT <= 0) return;
+  const enemyList = Frontline.active ? enemiesOf(player.team)
+                  : Extraction.active ? Extraction.enemies
+                  : enemies;
+  for (const e of enemyList) {
+    if (e.dead || !e.group) continue;
+    const d = e.group.position.distanceTo(player.pos);
+    if (d > 40) continue;
+    // Sprite above the enemy head, renders through walls
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({
+      color: 0xff2222,
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+      depthWrite: false,
+    }));
+    s.scale.set(1.0, 1.0, 1);
+    s.position.set(
+      e.group.position.x,
+      e.group.position.y + 3.0 * (e.def ? (e.def.scale || 1) : 1),
+      e.group.position.z
+    );
+    scene.add(s);
+    pulseSprites.push(s);
+  }
+}
+
+function deployTurret() {
+  if (!player.turrets) player.turrets = [];
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6),
+    new THREE.MeshLambertMaterial({ color: 0x445566 }));
+  base.position.y = 0.3; base.castShadow = true; g.add(base);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4),
+    new THREE.MeshLambertMaterial({ color: 0x334455 }));
+  head.position.y = 0.75; g.add(head);
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.8),
+    new THREE.MeshLambertMaterial({ color: 0x111111 }));
+  barrel.position.set(0, 0.75, -0.35); g.add(barrel);
+  // Place slightly in front of the player
+  const fwd = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+  const px = player.pos.x - fwd.x * 1.8;
+  const pz = player.pos.z - fwd.z * 1.8;
+  g.position.set(px, player.pos.y, pz);
+  scene.add(g);
+  player.turrets.push({
+    group: g,
+    head: head,
+    life: 10,
+    fireCd: 0.3,
+    team: player.team || 'red',
+  });
+}
+
+function updateAbilityHud() {
+  const hud = document.getElementById('abilityHud');
+  if (!hud) return;
+  if (!running) { hud.style.display = 'none'; return; }
+  hud.style.display = 'block';
+  const op = player.operator || 'assault';
+  const cfg = OPERATORS[op];
+  if (!cfg) return;
+  document.getElementById('abilityIconGlyph').textContent = cfg.icon;
+  document.getElementById('abilityName').textContent = cfg.ability;
+  const statusEl = document.getElementById('abilityStatus');
+  const fillEl = document.getElementById('abilityCooldownFill');
+  if (player.abilityT > 0) {
+    statusEl.textContent = 'COOLDOWN ' + Math.ceil(player.abilityT) + 's';
+    statusEl.style.color = '#fa8';
+    const pct = 100 * (1 - player.abilityT / cfg.cooldown);
+    fillEl.style.height = Math.max(0, Math.min(100, pct)) + '%';
+  } else {
+    statusEl.textContent = 'READY (F)';
+    statusEl.style.color = '#4bea8b';
+    fillEl.style.height = '0%';
+  }
+}
 
 function setupLoadoutForMatch() {
   if (CONFIG.mode === 'frontline') return;
@@ -3742,6 +3930,7 @@ addEventListener('keydown', function(e) {
   if (e.code === 'Escape' && Inventory.open) { closeInventory(); }
 
   if (e.code === 'KeyB' && Frontline.active) openPackShop();
+  if (e.code === 'KeyF' && running) useAbility();
   if (e.code === 'KeyE') {
     if (CONFIG.mode === 'extraction') handleInteract();
   }
@@ -3781,6 +3970,8 @@ function setupMobileControls() {
   btnJump.addEventListener('touchstart', function(e){ e.preventDefault(); mobile.jumpQueued = true; }, {passive:false});
   const btnSwap = document.getElementById('btnSwap');
   btnSwap.addEventListener('touchstart', function(e){ e.preventDefault(); switchWeapon((currentWeapon + 1) % activeLoadout.length); }, {passive:false});
+  const btnAbility = document.getElementById('btnAbility');
+  btnAbility.addEventListener('touchstart', function(e){ e.preventDefault(); useAbility(); }, {passive:false});
   const btnInteract = document.getElementById('btnInteract');
   btnInteract.addEventListener('touchstart', function(e){ e.preventDefault(); if (CONFIG.mode === 'extraction') handleInteract(); }, {passive:false});
 }
@@ -4495,7 +4686,7 @@ function startFrontline() {
   const spawn = player.team === 'red' ? currentMapDef.redSpawn : currentMapDef.blueSpawn;
   player.pos.set(spawn.x * TILE, 0, spawn.z * TILE);
   player.hp = 100; player.yaw = player.team === 'red' ? Math.PI/2 : -Math.PI/2; player.pitch = 0;
-  // armor carries over
+  applyOperatorPassives();
   applyEquippedArmor();
   let defaultPack = 'rifleman';
   if (Account.ownedPacks.length > 0) defaultPack = Account.ownedPacks[Account.ownedPacks.length - 1];
@@ -4528,6 +4719,7 @@ function startSurvival() {
   document.getElementById('extractProgress').classList.remove('active');
 
   setupLoadoutForMatch();
+  applyOperatorPassives();
   applyEquippedArmor();
   grenadeCharges = 3; grenadeRefillT = 0;
   buildWorld(CONFIG.mapKey);
@@ -4588,6 +4780,7 @@ function startExtractionMode() {
   Extraction.enemies = [];
 
   setupLoadoutForMatch();
+  applyOperatorPassives();
   applyEquippedArmor();
   grenadeCharges = 3; grenadeRefillT = 0;
   buildWorld('extraction');
@@ -4660,18 +4853,42 @@ function startGame() {
   const mapBtns = document.querySelectorAll('#mapRow .optBtn');
   const modeBtns = document.querySelectorAll('#modeRow .optBtn');
   const playBtn = document.getElementById('playBtn');
+  const operatorBtns = document.querySelectorAll('#operatorRow .optBtn');
+  operatorBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() { setOperator(btn.dataset.op); });
+  });
+  // Set initial selection
+  operatorBtns.forEach(function(b) {
+    b.classList.toggle('selected', b.dataset.op === Account.operator);
+  });
   platformBtns.forEach(function(btn) { btn.addEventListener('click', function() { platformBtns.forEach(function(b) { b.classList.remove('selected'); }); btn.classList.add('selected'); CONFIG.platform = btn.dataset.platform; }); });
-  modeBtns.forEach(function(btn) {
+    modeBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       modeBtns.forEach(function(b) { b.classList.remove('selected'); });
       btn.classList.add('selected');
       CONFIG.mode = btn.dataset.mode;
+
+      const mapHeading = document.getElementById('mapHeading');
+      const mapRow = document.getElementById('mapRow');
+
       if (CONFIG.mode === 'frontline') {
-        mapBtns.forEach(function(b) { b.classList.toggle('selected', b.dataset.map === 'frontline'); });
         CONFIG.mapKey = 'frontline';
+        mapHeading.style.display = 'none';
+        mapRow.style.display = 'none';
       } else if (CONFIG.mode === 'extraction') {
-        mapBtns.forEach(function(b) { b.classList.toggle('selected', b.dataset.map === 'extraction'); });
         CONFIG.mapKey = 'extraction';
+        mapHeading.style.display = 'none';
+        mapRow.style.display = 'none';
+      } else {
+        // survival — show map picker
+        mapHeading.style.display = 'block';
+        mapRow.style.display = 'flex';
+        // Default to 'field' if nothing valid is selected
+        const validMaps = ['field', 'bomb', 'desert'];
+        if (!validMaps.includes(CONFIG.mapKey)) {
+          CONFIG.mapKey = 'field';
+          mapBtns.forEach(function(b) { b.classList.toggle('selected', b.dataset.map === 'field'); });
+        }
       }
     });
   });
@@ -4680,16 +4897,6 @@ function startGame() {
       mapBtns.forEach(function(b) { b.classList.remove('selected'); });
       btn.classList.add('selected');
       CONFIG.mapKey = btn.dataset.map;
-      if (btn.dataset.map === 'frontline') {
-        modeBtns.forEach(function(b) { b.classList.toggle('selected', b.dataset.mode === 'frontline'); });
-        CONFIG.mode = 'frontline';
-      } else if (btn.dataset.map === 'extraction') {
-        modeBtns.forEach(function(b) { b.classList.toggle('selected', b.dataset.mode === 'extraction'); });
-        CONFIG.mode = 'extraction';
-      } else {
-        modeBtns.forEach(function(b) { b.classList.toggle('selected', b.dataset.mode === 'survival'); });
-        CONFIG.mode = 'survival';
-      }
     });
   });
   document.getElementById('loginBtn').addEventListener('click', doLogin);
@@ -4792,6 +4999,52 @@ function loop() {
   if (!running) { renderer.render(scene, camera); return; }
   if (Inventory.open) { renderer.render(scene, camera); return; }
   const dt = Math.min(clock.getDelta(), 0.05);
+  // Operator ability timers
+  if (player.abilityT > 0) player.abilityT -= dt;
+  if (player.sprintT > 0) player.sprintT -= dt;
+  if (player.reconPulseT > 0) player.reconPulseT -= dt;
+  if (player.reconPulseT > 0 || pulseSprites.length > 0) updateReconPulse();
+  updateAbilityHud();
+  // ============ ENGINEER TURRETS ============
+  if (player.turrets && player.turrets.length > 0) {
+    for (let i = player.turrets.length - 1; i >= 0; i--) {
+      const t = player.turrets[i];
+      t.life -= dt;
+      if (t.life <= 0) { scene.remove(t.group); player.turrets.splice(i, 1); continue; }
+      // Find nearest enemy
+      const enemyList = Frontline.active ? enemiesOf(t.team)
+                      : Extraction.active ? Extraction.enemies
+                      : enemies;
+      let best = null, bestD = 20;
+      for (const e of enemyList) {
+        if (e.dead || !e.group) continue;
+        const d = t.group.position.distanceTo(e.group.position);
+        if (d < bestD && hasLineOfSight(t.group.position.x, t.group.position.y + 0.75, t.group.position.z,
+                                        e.group.position.x, e.group.position.y + 1.2, e.group.position.z)) {
+          best = e; bestD = d;
+        }
+      }
+      if (best) {
+        // Rotate head to face target
+        t.head.rotation.y = Math.atan2(
+          best.group.position.x - t.group.position.x,
+          best.group.position.z - t.group.position.z
+        );
+        t.fireCd -= dt;
+        if (t.fireCd <= 0) {
+          const muzzlePos = t.group.position.clone().add(new THREE.Vector3(0, 0.75, 0));
+          const dir = new THREE.Vector3(
+            best.group.position.x - muzzlePos.x + (Math.random()-0.5) * 0.8,
+            (best.group.position.y + 1.2) - muzzlePos.y + (Math.random()-0.5) * 0.3,
+            best.group.position.z - muzzlePos.z + (Math.random()-0.5) * 0.8
+          ).normalize();
+          spawnBullet(muzzlePos, dir, 'player', false, 8, 50, false, t.team);
+          Audio.gunshot(0.3);
+          t.fireCd = 0.2;
+        }
+      }
+    }
+  }
   const weaponId = getActiveWeaponId();
   const weapon = WEAPON_STATS[weaponId];
   const isMobile = CONFIG.platform === 'mobile';
@@ -4937,7 +5190,8 @@ function loop() {
     }
     if (move.lengthSq() > 0) move.normalize();
     const zooming = !isMobile && rightDown && weapon.zoom;
-    const baseSpeed = zooming ? 2.5 : 7;
+    let baseSpeed = zooming ? 2.5 : 7;
+    if (player.sprintT > 0 && !zooming) baseSpeed *= 1.7;
     const speed = baseSpeed * (weapon.moveSpeedMul || 1) * dt, r = player.radius;
     const tryX = player.pos.x + move.x * speed;
     if (!blockedAt(tryX - r, player.pos.z - r, player.pos.y) &&
