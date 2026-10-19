@@ -580,6 +580,116 @@
   #muteHint { position: fixed; bottom: 4px; left: 8px; font: 11px monospace;
               color: rgba(255,255,255,0.4); pointer-events: none; z-index: 60; }
   
+  /* ============ STASH (Delta-style) ============ */
+  .stash-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+    max-width: 720px;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .stash-item {
+    position: relative;
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 14px 8px 10px 8px;
+    text-align: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.1s, box-shadow 0.1s;
+    background: linear-gradient(135deg, rgba(30,40,55,0.95), rgba(15,22,32,0.95));
+  }
+  .stash-item:hover { transform: translateY(-3px); }
+  .stash-item.selected { transform: translateY(-3px) scale(1.03); }
+  .stash-item .si-stripe {
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  }
+  .stash-item .si-icon { font-size: 42px; line-height: 1; margin-bottom: 6px; }
+  .stash-item .si-name { font-size: 12px; color: #fff; font-weight: bold;
+                         letter-spacing: 1px; }
+  .stash-item .si-tier { font-size: 9px; letter-spacing: 2px; margin-top: 4px; }
+  .stash-item .si-price { font-size: 11px; color: #ffd94a; margin-top: 4px; }
+
+  /* Rarity backgrounds (soft tinted gradient, not just border) */
+  .stash-item.tier-common {
+    border-color: #8a8a8a;
+    background: linear-gradient(135deg, rgba(58,58,58,0.9), rgba(30,30,30,0.95));
+  }
+  .stash-item.tier-common .si-stripe { background: #8a8a8a; }
+  .stash-item.tier-common .si-tier { color: #8a8a8a; }
+
+  .stash-item.tier-uncommon {
+    border-color: #4bea8b;
+    background: linear-gradient(135deg, rgba(30,68,48,0.9), rgba(15,35,25,0.95));
+    box-shadow: 0 0 12px rgba(75,234,139,0.3);
+  }
+  .stash-item.tier-uncommon .si-stripe { background: #4bea8b; }
+  .stash-item.tier-uncommon .si-tier { color: #4bea8b; }
+
+  .stash-item.tier-rare {
+    border-color: #4a9eff;
+    background: linear-gradient(135deg, rgba(30,48,90,0.9), rgba(15,25,45,0.95));
+    box-shadow: 0 0 14px rgba(74,158,255,0.4);
+  }
+  .stash-item.tier-rare .si-stripe { background: #4a9eff; }
+  .stash-item.tier-rare .si-tier { color: #4a9eff; }
+
+  .stash-item.tier-epic {
+    border-color: #aa66ff;
+    background: linear-gradient(135deg, rgba(60,30,90,0.9), rgba(30,15,45,0.95));
+    box-shadow: 0 0 16px rgba(170,102,255,0.5);
+  }
+  .stash-item.tier-epic .si-stripe { background: #aa66ff; }
+  .stash-item.tier-epic .si-tier { color: #aa66ff; }
+
+  .stash-item.tier-legendary {
+    border-color: #ffd94a;
+    background: linear-gradient(135deg, rgba(90,65,20,0.9), rgba(45,30,10,0.95));
+    box-shadow: 0 0 18px rgba(255,217,74,0.55);
+  }
+  .stash-item.tier-legendary .si-stripe { background: #ffd94a; }
+  .stash-item.tier-legendary .si-tier { color: #ffd94a; }
+
+  .stash-item.tier-red {
+    border-color: #ff4444;
+    background: linear-gradient(135deg, rgba(90,25,25,0.9), rgba(45,12,12,0.95));
+    box-shadow: 0 0 16px rgba(255,68,68,0.55);
+  }
+  .stash-item.tier-red .si-stripe { background: #ff4444; }
+  .stash-item.tier-red .si-tier { color: #ff4444; }
+
+  /* Stash detail panel */
+  .stash-detail {
+    width: 100%; max-width: 500px;
+    background: #0d1420; border: 2px solid #1e2a3d; border-radius: 8px;
+    padding: 14px; margin-top: 14px; font-family: monospace;
+  }
+  .stash-detail .sd-name { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
+  .stash-detail .sd-tier {
+    display: inline-block; font-size: 10px; letter-spacing: 2px;
+    padding: 2px 8px; border-radius: 3px; margin-bottom: 10px;
+    border: 1px solid currentColor;
+  }
+  .stash-detail .sd-row {
+    display: flex; justify-content: space-between;
+    font-size: 12px; padding: 4px 0;
+    border-bottom: 1px solid #1a2330; color: #8899aa;
+  }
+  .stash-detail .sd-row span:last-child { color: #fff; }
+
+  /* Tinted backgrounds for safe slots + armor cards too */
+  .safeSlot.tier-common { background: rgba(58,58,58,0.6); }
+  .safeSlot.tier-uncommon { background: rgba(30,68,48,0.6); }
+  .safeSlot.tier-rare { background: rgba(30,48,90,0.6); }
+  .safeSlot.tier-epic { background: rgba(60,30,90,0.6); }
+  .safeSlot.tier-legendary { background: rgba(90,65,20,0.6); }
+
+  .armorCard.tier-common { background: rgba(58,58,58,0.6); }
+  .armorCard.tier-rare { background: rgba(30,48,90,0.6); }
+  .armorCard.tier-uncommon { background: rgba(30,68,48,0.6); }
+
   /* ============ INVENTORY (Simple) ============ */
   #inventoryModal {
     position: fixed; inset: 0; z-index: 250; display: none;
@@ -831,7 +941,8 @@
   </div>
 
   <div style="color:#ffd94a;font-size:13px;margin:20px 0 6px">STASHED WEAPONS:</div>
-  <div id="stashGrid"></div>
+  <div id="stashGrid" class="stash-items-grid"></div>
+  <div id="stashDetail" class="stash-detail" style="display:none"></div>
   <div id="stashMsg"></div>
     <div style="color:#4bea8b;font-size:13px;margin:20px 0 6px">SELL WEAPONS — click to sell for coins</div>
   <div id="sellGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-width:720px;width:100%;"></div>
@@ -1343,12 +1454,16 @@ function openStash() {
   renderStash();
 }
 function renderStash() {
-  // Safe box slots
+  // Safe box slots — tinted by tier
   const safeBox = Account.user.safeBox || [];
   document.querySelectorAll('#safeBoxSlots .safeSlot').forEach(function(el, i) {
-    const id = safeBox[i]; el.className = 'safeSlot';
+    const id = safeBox[i];
+    el.className = 'safeSlot';
+    // Remove any old tier class
+    el.classList.remove('tier-common', 'tier-uncommon', 'tier-rare', 'tier-epic', 'tier-legendary');
     if (id && WEAPON_INFO[id]) {
-      el.classList.add('filled');
+      const tier = WEAPON_TIER[id] || 'common';
+      el.classList.add('filled', 'tier-' + tier);
       el.innerHTML = '<span class="slotLabel">SB ' + (i+1) + '</span>' +
         '<button class="removeBtn" data-sb-remove="' + i + '">×</button>' +
         '<div class="icon">' + WEAPON_INFO[id].icon + '</div>' +
@@ -1366,27 +1481,27 @@ function renderStash() {
       renderStash();
     });
   });
-  // click empty slot to open picker
   document.querySelectorAll('#safeBoxSlots .safeSlot').forEach(function(el) {
     el.addEventListener('click', function(e) {
       if (e.target.classList.contains('removeBtn')) return;
       const idx = Number(el.dataset.sb);
       const box = Account.user.safeBox || [];
-      if (box[idx]) return; // already filled
+      if (box[idx]) return;
       safeBoxPickTarget = idx;
       openSafeBoxPicker();
     });
   });
 
-  // Armor row
+  // Armor row — tinted by tier
   const armorRow = document.getElementById('armorRow'); armorRow.innerHTML = '';
   const ownedArmor = Account.user.ownedArmor || [];
   const equippedArmor = Account.user.equippedArmor || 'none';
   const isAdmin = Account.user.isAdmin;
   ['none', 'light', 'heavy'].forEach(function(aid) {
     const info = ARMOR_INFO[aid];
+    const tier = ARMOR_TIER[aid] || 'common';
     const card = document.createElement('div');
-    card.className = 'armorCard';
+    card.className = 'armorCard tier-' + tier;
     const owned = aid === 'none' || ownedArmor.includes(aid) || isAdmin;
     if (!owned) card.classList.add('locked');
     if (equippedArmor === aid) card.classList.add('equipped');
@@ -1400,48 +1515,83 @@ function renderStash() {
     armorRow.appendChild(card);
   });
 
-  // Stash weapons grid
-  const stashGrid = document.getElementById('stashGrid'); stashGrid.innerHTML = '';
+  // Stash items grid — rarity-tinted cards
+  const stashGrid = document.getElementById('stashGrid');
+  stashGrid.innerHTML = '';
   const stash = Account.user.stash || [];
   if (stash.length === 0) {
-    stashGrid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px">No stashed weapons yet. Extract loot from the Extraction mode to fill your stash.</div>';
-    return;
-  }
+    stashGrid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;grid-column:1/-1;text-align:center">No stashed weapons yet. Extract loot from the Extraction mode to fill your stash.</div>';
+  } else {
     stash.forEach(function(id) {
-    const info = WEAPON_INFO[id]; if (!info) return;
-    const card = document.createElement('div'); card.className = 'stashCard';
-    card.innerHTML = '<div class="icon">' + info.icon + '</div><div class="wName">' + info.name + '</div>';
-    stashGrid.appendChild(card);
-  });
+      const info = WEAPON_INFO[id]; if (!info) return;
+      const tier = WEAPON_TIER[id] || 'common';
+      const rarity = RARITY[tier] || RARITY.common;
+      const card = document.createElement('div');
+      card.className = 'stash-item tier-' + tier;
+      card.innerHTML =
+        '<div class="si-stripe"></div>' +
+        '<div class="si-icon">' + info.icon + '</div>' +
+        '<div class="si-name">' + info.name + '</div>' +
+        '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>';
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.stash-item').forEach(function(el) {
+          el.classList.remove('selected');
+        });
+        card.classList.add('selected');
+        showStashDetail(id);
+      });
+      stashGrid.appendChild(card);
+    });
+  }
 
   renderSellGrid();
 }
+
+function showStashDetail(id) {
+  const detail = document.getElementById('stashDetail');
+  if (!detail) return;
+  const info = WEAPON_INFO[id];
+  if (!info) { detail.style.display = 'none'; return; }
+  const tier = WEAPON_TIER[id] || 'common';
+  const rarity = RARITY[tier] || RARITY.common;
+  const price = WEAPON_SELL_PRICE[id] || 0;
+  detail.style.display = 'block';
+  detail.innerHTML =
+    '<div class="sd-name" style="color:' + rarity.color + '">' + info.name + '</div>' +
+    '<div class="sd-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
+    '<div class="sd-row"><span>SELL PRICE</span><span>🪙 ' + price + '</span></div>' +
+    '<div class="sd-row"><span>TYPE</span><span>Weapon</span></div>' +
+    '<div class="sd-row"><span>SOURCE</span><span>Extracted from raid</span></div>';
+}
+
 
 function renderSellGrid() {
   const grid = document.getElementById('sellGrid');
   if (!grid) return;
   grid.innerHTML = '';
+  grid.className = 'stash-items-grid';
   const pool = [];
-  // Everything you own or have in stash is sellable
   (Account.user.ownedWeapons || []).forEach(function(w) { if (!pool.includes(w)) pool.push(w); });
   (Account.user.stash || []).forEach(function(w) { if (!pool.includes(w)) pool.push(w); });
 
   if (pool.length === 0) {
-    grid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px">No weapons to sell.</div>';
+    grid.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;grid-column:1/-1;text-align:center">No weapons to sell.</div>';
     return;
   }
 
   pool.forEach(function(id) {
     const info = WEAPON_INFO[id]; if (!info) return;
     const price = WEAPON_SELL_PRICE[id] || 0;
+    const tier = WEAPON_TIER[id] || 'common';
+    const rarity = RARITY[tier] || RARITY.common;
     const card = document.createElement('div');
-    card.className = 'stashCard';
-    card.style.borderColor = price > 0 ? '#4bea8b' : '#666';
+    card.className = 'stash-item tier-' + tier;
     card.innerHTML =
-      '<div class="icon">' + info.icon + '</div>' +
-      '<div class="wName">' + info.name + '</div>' +
-      '<div style="font-size:11px;color:#ffd94a;margin-top:4px">🪙 ' + price + '</div>' +
-      '<div style="font-size:10px;color:#4bea8b;margin-top:2px">CLICK TO SELL</div>';
+      '<div class="si-stripe"></div>' +
+      '<div class="si-icon">' + info.icon + '</div>' +
+      '<div class="si-name">' + info.name + '</div>' +
+      '<div class="si-tier" style="color:' + rarity.color + '">' + rarity.label + '</div>' +
+      '<div class="si-price">🪙 ' + price + '</div>';
     if (price <= 0) {
       card.style.opacity = '0.4';
       card.style.cursor = 'default';
@@ -1451,6 +1601,7 @@ function renderSellGrid() {
     grid.appendChild(card);
   });
 }
+
 
 async function sellWeapon(id) {
   const price = WEAPON_SELL_PRICE[id] || 0;
