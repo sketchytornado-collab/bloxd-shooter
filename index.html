@@ -3174,7 +3174,7 @@ const CHEST_RARITY = {
     color: 0x8a8a8a, edge: 0x555555, label: 'COMMON', openTime: 1.2,
     rollCount: [1, 2],
     nothingChance: 0.15,
-    weaponWeights:  { m16: 40, mp5: 40, ak47: 15, m1916: 5 },
+    weaponWeights:  { mp5: 60, ak47: 25, m1916: 15 },
     armorWeights:   { light: 100 },
     valuableWeights:{ scrap: 40, ration: 30, apple: 20, hard_drive: 8, radio_part: 2 },
     valuableChance: 0.35,
@@ -3443,7 +3443,7 @@ function createExtractionEnemy() {
     patrolTimer: 0,
     state: 'patrol', // patrol | alert
     hasAlerted: false,
-    dropWeapon: ['m16', 'ak47', 'mp5', 'scar'][Math.floor(Math.random() * 4)],
+    dropWeapon: ['ak47', 'mp5', 'scar'][Math.floor(Math.random() * 3)],
     dropArmor: Math.random() < 0.3 ? 'light' : null,
   });
 }
