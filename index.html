@@ -49,9 +49,83 @@
                  transform: translateY(-8px) scale(1.06);
                  box-shadow: 0 0 22px rgba(74,158,255,0.8); }
   .slot.active .name { color: #fff; }
-  #zoomVignette { position: fixed; inset: 0; pointer-events: none;
+   #zoomVignette { position: fixed; inset: 0; pointer-events: none;
                   box-shadow: inset 0 0 200px 40px rgba(0,0,0,0.9);
                   opacity: 0; transition: opacity 0.15s; }
+
+  /* ============ SNIPER SCOPE ============ */
+  #sniperScope { position: fixed; inset: 0; z-index: 56;
+                 pointer-events: none; display: none; }
+  #sniperScope.active { display: block; }
+
+  #sniperScope .scope-surround {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle 43vmin at 50% 50%,
+        transparent 0 42.3vmin,
+        rgba(0,0,0,0.6) 42.3vmin 42.9vmin,
+        #000 42.9vmin 100%);
+  }
+  #sniperScope .scope-circle {
+    position: absolute; left: 50%; top: 50%;
+    width: 86vmin; height: 86vmin;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 0 3px rgba(0,0,0,0.95),
+      inset 0 0 40px 12px rgba(0,0,0,0.9),
+      inset 0 0 14vmin rgba(0,10,25,0.35);
+    background:
+      radial-gradient(circle at 50% 45%,
+        rgba(150,200,255,0.04),
+        rgba(10,25,45,0.18) 70%,
+        rgba(0,0,0,0.4));
+  }
+  #sniperScope .scope-lens {
+    position: absolute; inset: 0; border-radius: 50%;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 30% 24%, rgba(200,230,255,0.08), transparent 42%),
+      radial-gradient(circle at 70% 78%, rgba(120,180,255,0.04), transparent 48%);
+  }
+  #sniperScope .scope-reticle {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: block; pointer-events: none;
+  }
+  #sniperScope .scope-info {
+    position: absolute; left: 50%; bottom: 6vmin;
+    transform: translateX(-50%);
+    font: bold 11px monospace; letter-spacing: 4px;
+    color: rgba(255,255,255,0.55);
+    text-shadow: 0 0 6px #000, 0 0 12px rgba(0,0,0,0.9);
+    white-space: nowrap;
+  }
+
+  body.scoped #crosshair,
+  body.scoped #minimap,
+  body.scoped #hotbar,
+  body.scoped #coinHud,
+  body.scoped #allies,
+  body.scoped #abilityHud,
+  body.scoped #killFeed,
+  body.scoped #captureIndicators {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.08s;
+  }
+
+  #btnScope {
+    right: 30px; width: 66px; height: 66px; font-size: 10px;
+    bottom: calc(max(30px, env(safe-area-inset-bottom)) + 300px);
+    display: none;
+  }
+  #btnScope.on {
+    background: rgba(255,200,60,0.85);
+    border-color: #ffd94a;
+    box-shadow: 0 0 18px rgba(255,217,74,0.8);
+  }
+
 
   #frontlineHud { position: fixed; top: 0; left: 50%; transform: translateX(-50%);
                   display: none; flex-direction: column; align-items: center;
@@ -1062,6 +1136,113 @@
 <div id="crosshair"></div>
 <canvas id="minimap" width="200" height="200"></canvas>
 <div id="zoomVignette"></div>
+<div id="sniperScope">
+  <div class="scope-surround"></div>
+  <div class="scope-circle">
+    <div class="scope-lens"></div>
+    <svg class="scope-reticle" viewBox="0 0 1000 1000"
+         preserveAspectRatio="xMidYMid meet"
+         xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="reticleHalo" x="-20%" y="-20%" width="140%" height="140%">
+          <feMorphology in="SourceAlpha" operator="dilate" radius="1.5" result="dil"/>
+          <feFlood flood-color="white" flood-opacity="0.75"/>
+          <feComposite in2="dil" operator="in" result="halo"/>
+          <feMerge>
+            <feMergeNode in="halo"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <g filter="url(#reticleHalo)">
+
+        <!-- ═════ DASHED XY GRID (all 4 quadrants) ═════ -->
+        <g stroke="rgba(255,255,255,0.32)" stroke-width="1.2"
+           stroke-dasharray="4 10">
+          <line x1="200" y1="80" x2="200" y2="920"/>
+          <line x1="300" y1="80" x2="300" y2="920"/>
+          <line x1="400" y1="80" x2="400" y2="920"/>
+          <line x1="600" y1="80" x2="600" y2="920"/>
+          <line x1="700" y1="80" x2="700" y2="920"/>
+          <line x1="800" y1="80" x2="800" y2="920"/>
+          <line x1="80" y1="200" x2="920" y2="200"/>
+          <line x1="80" y1="300" x2="920" y2="300"/>
+          <line x1="80" y1="400" x2="920" y2="400"/>
+          <line x1="80" y1="600" x2="920" y2="600"/>
+          <line x1="80" y1="700" x2="920" y2="700"/>
+          <line x1="80" y1="800" x2="920" y2="800"/>
+        </g>
+
+        <!-- ═════ MAIN THIN CROSSHAIR ═════ -->
+        <g stroke="#0a0a0a" stroke-width="2">
+          <line x1="500" y1="0" x2="500" y2="1000"/>
+          <line x1="0" y1="500" x2="1000" y2="500"/>
+        </g>
+
+        <!-- ═════ THICK OUTER POSTS (German #4) ═════ -->
+        <g stroke="#0a0a0a" stroke-width="16" stroke-linecap="butt">
+          <line x1="0"   y1="500" x2="180"  y2="500"/>
+          <line x1="820" y1="500" x2="1000" y2="500"/>
+          <line x1="500" y1="820" x2="500"  y2="1000"/>
+        </g>
+
+        <!-- ═════ X AXIS (WINDAGE) TICKS + NUMBERS ═════ -->
+        <g stroke="#0a0a0a" stroke-width="2.5">
+          <line x1="250" y1="492" x2="250" y2="508"/>
+          <line x1="350" y1="492" x2="350" y2="508"/>
+          <line x1="450" y1="492" x2="450" y2="508"/>
+          <line x1="550" y1="492" x2="550" y2="508"/>
+          <line x1="650" y1="492" x2="650" y2="508"/>
+          <line x1="750" y1="492" x2="750" y2="508"/>
+          <line x1="200" y1="486" x2="200" y2="514"/>
+          <line x1="300" y1="486" x2="300" y2="514"/>
+          <line x1="400" y1="486" x2="400" y2="514"/>
+          <line x1="600" y1="486" x2="600" y2="514"/>
+          <line x1="700" y1="486" x2="700" y2="514"/>
+          <line x1="800" y1="486" x2="800" y2="514"/>
+        </g>
+        <g fill="#0a0a0a" font-family="monospace" font-weight="bold"
+           font-size="24" text-anchor="middle">
+          <text x="400" y="472">1</text>
+          <text x="600" y="472">1</text>
+          <text x="300" y="472">2</text>
+          <text x="700" y="472">2</text>
+          <text x="200" y="472">3</text>
+          <text x="800" y="472">3</text>
+        </g>
+
+        <!-- ═════ Y AXIS (ELEVATION) TICKS + NUMBERS ═════ -->
+        <g stroke="#0a0a0a" stroke-width="2.5">
+          <line x1="492" y1="550" x2="508" y2="550"/>
+          <line x1="492" y1="650" x2="508" y2="650"/>
+          <line x1="492" y1="750" x2="508" y2="750"/>
+          <line x1="486" y1="600" x2="514" y2="600"/>
+          <line x1="486" y1="700" x2="514" y2="700"/>
+          <line x1="486" y1="800" x2="514" y2="800"/>
+        </g>
+        <g fill="#0a0a0a" font-family="monospace" font-weight="bold"
+           font-size="24" text-anchor="start">
+          <text x="522" y="608">1</text>
+          <text x="522" y="708">2</text>
+          <text x="522" y="808">3</text>
+        </g>
+
+        <!-- ═════ ABOVE-CENTER REFERENCE TICKS ═════ -->
+        <g stroke="#0a0a0a" stroke-width="2">
+          <line x1="492" y1="450" x2="508" y2="450"/>
+          <line x1="492" y1="400" x2="508" y2="400"/>
+          <line x1="492" y1="350" x2="508" y2="350"/>
+        </g>
+
+        <!-- ═════ CENTER AIM POINT ═════ -->
+        <circle cx="500" cy="500" r="3" fill="#0a0a0a"/>
+        <circle cx="500" cy="500" r="1.2" fill="#0a0a0a"/>
+      </g>
+    </svg>
+  </div>
+  <div class="scope-info">AWP · 8× · 200 DMG</div>
+</div>
 <div id="abilityHud" style="position:fixed;left:18px;top:calc(170px + env(safe-area-inset-top));z-index:60;pointer-events:none;display:none;font:bold 12px monospace;color:#fff;text-shadow:1px 1px 2px #000;">
   <div style="display:flex;align-items:center;gap:8px;">
     <div id="abilityIcon" style="width:38px;height:38px;border-radius:50%;background:rgba(20,30,50,0.85);border:2px solid #4a9eff;display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;overflow:hidden;">
@@ -1089,6 +1270,7 @@
   <div class="mBtn" id="btnSwap">SWAP</div>
   <div class="mBtn" id="btnAbility">F</div>
   <div class="mBtn" id="btnInteract">USE</div>
+  <div class="mBtn" id="btnScope">SCOPE</div>
 </div>
 
 <div id="menu">
@@ -1314,7 +1496,7 @@ const WEAPON_STATS = {
   mp5:     { fireRate: 0.06, auto: true,  damage: 8,  spread: 0.030, bulletSpeed: 40,  moveSpeedMul: 1.05, isGrenade: false },
   scar:    { fireRate: 0.14, auto: true,  damage: 26, spread: 0.018, bulletSpeed: 50,  moveSpeedMul: 0.9,  isGrenade: false },
   minigun: { fireRate: 0.035, auto: true, damage: 10, spread: 0.055, bulletSpeed: 42,  moveSpeedMul: 0.65, isGrenade: false },
-  awp:     { fireRate: 1.3,  auto: false, damage: 150, spread: 0.0,  bulletSpeed: 120, moveSpeedMul: 0.85, isGrenade: false, zoom: true },
+  awp:     { fireRate: 1.3,  auto: false, damage: 200, spread: 0.0,  bulletSpeed: 160, moveSpeedMul: 0.85, isGrenade: false, zoom: true },
   grenade: { fireRate: 0.8,  auto: false, damage: 0,   spread: 0,    bulletSpeed: 0,   moveSpeedMul: 1.0,  isGrenade: true, maxGrenades: 3, refillTime: 12 },
 };
 
@@ -2535,7 +2717,7 @@ function buildMapTextures(def) {
 // ================= SCENE =================
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 500);
-const BASE_FOV = 75, SNIPER_FOV = 22;
+const BASE_FOV = 75, SNIPER_FOV = 18;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -2924,13 +3106,88 @@ function buildSCAR() {
 }
 function buildAWP() {
   const g = new THREE.Group();
-  makeBox(0.15,0.15,1.35, 0.26,-0.22,-0.8, gunMats.greenGun, g);
-  makeBox(0.07,0.07,0.9, 0.26,-0.2,-1.85, gunMats.metal, g);
-  makeBox(0.13,0.13,0.2, 0.26,-0.2,-2.35, gunMats.dark, g);
-  const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.55,10), gunMats.blackGun);
-  scope.rotation.z = Math.PI / 2;
-  scope.position.set(0.26,0.0,-0.75); g.add(scope);
-  makeBox(0.10,0.28,0.12, 0.26,-0.45,-0.42, gunMats.grip, g);
+
+  // ---- Gun body ----
+  makeBox(0.15, 0.15, 1.35, 0.26, -0.22, -0.8, gunMats.greenGun, g);
+  makeBox(0.07, 0.07, 0.9,  0.26, -0.2,  -1.85, gunMats.metal,    g);
+  makeBox(0.13, 0.13, 0.2,  0.26, -0.2,  -2.35, gunMats.dark,     g);
+  makeBox(0.10, 0.28, 0.12, 0.26, -0.45, -0.42, gunMats.grip,     g);
+
+  // ---- Scope assembly (aligned along Z = barrel direction) ----
+  const scopeY = 0.06;
+
+  const scopeTube = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.075, 0.075, 0.62, 16),
+    gunMats.blackGun
+  );
+  scopeTube.rotation.x = Math.PI / 2;   // <-- THE FIX (was rotation.z)
+  scopeTube.position.set(0.26, scopeY, -0.75);
+  g.add(scopeTube);
+
+  const objective = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.098, 0.075, 0.16, 16),
+    gunMats.dark
+  );
+  objective.rotation.x = Math.PI / 2;
+  objective.position.set(0.26, scopeY, -1.14);
+  g.add(objective);
+
+  const frontLens = new THREE.Mesh(
+    new THREE.CircleGeometry(0.092, 20),
+    new THREE.MeshBasicMaterial({ color: 0x2c4a6a })
+  );
+  frontLens.position.set(0.26, scopeY, -1.221);
+  frontLens.rotation.y = Math.PI;
+  g.add(frontLens);
+
+  const eyepiece = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.075, 0.088, 0.14, 16),
+    gunMats.dark
+  );
+  eyepiece.rotation.x = Math.PI / 2;
+  eyepiece.position.set(0.26, scopeY, -0.37);
+  g.add(eyepiece);
+
+  const rearLens = new THREE.Mesh(
+    new THREE.CircleGeometry(0.08, 20),
+    new THREE.MeshBasicMaterial({ color: 0x1a2a3a })
+  );
+  rearLens.position.set(0.26, scopeY, -0.299);
+  g.add(rearLens);
+
+  const elevTurret = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.032, 0.032, 0.06, 12),
+    gunMats.dark
+  );
+  elevTurret.position.set(0.26, scopeY + 0.075, -0.72);
+  g.add(elevTurret);
+  const elevCap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.038, 0.038, 0.015, 12),
+    gunMats.metal
+  );
+  elevCap.position.set(0.26, scopeY + 0.11, -0.72);
+  g.add(elevCap);
+
+  const windageTurret = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.028, 0.05, 12),
+    gunMats.dark
+  );
+  windageTurret.rotation.z = Math.PI / 2;
+  windageTurret.position.set(0.26 + 0.075 + 0.025, scopeY, -0.72);
+  g.add(windageTurret);
+
+  [-0.55, -0.92].forEach(function(zPos) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.082, 0.018, 8, 20),
+      gunMats.metal
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0.26, scopeY, zPos);
+    g.add(ring);
+    makeBox(0.055, 0.13, 0.05, 0.26, scopeY - 0.14, zPos, gunMats.dark, g);
+  });
+
+  makeBox(0.04, 0.05, 0.15, 0.26, -0.28, -1.75, gunMats.dark, g);
   return g;
 }
 function buildGrenadeModel() {
@@ -3124,7 +3381,13 @@ function setupLoadoutForMatch() {
   updateHotbarUI();
   updateActiveWeaponModel();
 }
-function updateActiveWeaponModel() { for (const id in weaponModels) weaponModels[id].visible = false; const id = getActiveWeaponId(); if (weaponModels[id]) weaponModels[id].visible = true; }
+function updateActiveWeaponModel() {
+  for (const id in weaponModels) weaponModels[id].visible = false;
+  const id = getActiveWeaponId();
+  if (weaponModels[id]) weaponModels[id].visible = true;
+  const btnScope = document.getElementById('btnScope');
+  if (btnScope) btnScope.style.display = (id === 'awp') ? 'flex' : 'none';
+}
 function switchWeapon(i) { if (i === currentWeapon || i < 0 || i >= activeLoadout.length) return; currentWeapon = i; updateHotbarUI(); updateActiveWeaponModel(); Audio.weaponSwitch(); }
 function updateHotbarUI() {
   for (let i = 0; i < 3; i++) {
@@ -4463,7 +4726,7 @@ addEventListener('keydown', function(e) {
 addEventListener('keyup', function(e) { keys[e.code] = false; });
 let mouseDown = false, locked = false, rightDown = false;
 
-const mobile = { joyActive: false, joyX: 0, joyY: 0, lookActive: false, lookLastX: 0, lookLastY: 0, fireHeld: false, jumpQueued: false, interactQueued: false };
+const mobile = { joyActive: false, joyX: 0, joyY: 0, lookActive: false, lookLastX: 0, lookLastY: 0, fireHeld: false, jumpQueued: false, interactQueued: false, scopeHeld: false };
 function setupMobileControls() {
   const joyBase = document.getElementById('joyBase');
   const joyKnob = document.getElementById('joyKnob');
@@ -4499,16 +4762,29 @@ function setupMobileControls() {
   btnAbility.addEventListener('touchstart', function(e){ e.preventDefault(); useAbility(); }, {passive:false});
   const btnInteract = document.getElementById('btnInteract');
   btnInteract.addEventListener('touchstart', function(e){ e.preventDefault(); if (CONFIG.mode === 'extraction') handleInteract(); }, {passive:false});
+  const btnScope = document.getElementById('btnScope');
+  if (btnScope) {
+    btnScope.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      mobile.scopeHeld = !mobile.scopeHeld;
+      btnScope.classList.toggle('on', mobile.scopeHeld);
+    }, {passive:false});
+  }
 }
 
 // ================= STATE =================
 let score = 0, shakeT = 0, lastShot = 0;
 let footstepT = 0, wasOnGround = true;
 const clock = new THREE.Clock();
+// AWP scope + game state
 const zoomVignette = document.getElementById('zoomVignette');
+const sniperScopeEl = document.getElementById('sniperScope');
+let isZoomed = false;
+let sniperZoomPunch = 0;
 let gameStarted = false;
 let running = false;
 let scoreSaved = false;
+
 
 // ================= TOAST =================
 function showToast(text) {
@@ -5521,8 +5797,9 @@ document.addEventListener('pointerlockchange', function() {
 document.getElementById('menu').addEventListener('click', function() { if (CONFIG.platform === 'pc') renderer.domElement.requestPointerLock(); });
 document.addEventListener('mousemove', function(e) {
   if (CONFIG.platform !== 'pc' || !locked) return;
-  player.yaw -= e.movementX * 0.0022;
-  player.pitch -= e.movementY * 0.0022;
+  const zoomMul = isZoomed ? 0.38 : 1;
+  player.yaw -= e.movementX * 0.0022 * zoomMul;
+  player.pitch -= e.movementY * 0.0022 * zoomMul;
   player.pitch = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, player.pitch));
 });
 document.addEventListener('mousedown', function(e) {
@@ -5585,8 +5862,15 @@ function showSurvivalDeath() {
 // ================= MAIN LOOP =================
 function loop() {
   requestAnimationFrame(loop);
-  if (!running) { renderer.render(scene, camera); return; }
-  if (Inventory.open) { renderer.render(scene, camera); return; }
+  if (!running || Inventory.open) {
+    if (sniperScopeEl && sniperScopeEl.classList.contains('active')) {
+      sniperScopeEl.classList.remove('active');
+      document.body.classList.remove('scoped');
+      isZoomed = false;
+    }
+    renderer.render(scene, camera);
+    return;
+  }
   const dt = Math.min(clock.getDelta(), 0.05);
   // Operator ability timers
   if (player.abilityT > 0) player.abilityT -= dt;
@@ -5786,8 +6070,13 @@ function loop() {
       if (keys['KeyD']) move.add(right);
     }
     if (move.lengthSq() > 0) move.normalize();
-    const zooming = !isMobile && rightDown && weapon.zoom;
-    let baseSpeed = zooming ? 2.5 : 7;
+    const zoomInput = isMobile ? mobile.scopeHeld : rightDown;
+    const zooming = zoomInput && weapon.zoom;
+    isZoomed = zooming;
+    if (sniperScopeEl) sniperScopeEl.classList.toggle('active', zooming);
+    document.body.classList.toggle('scoped', zooming);
+    if (weaponModels[weaponId]) weaponModels[weaponId].visible = !zooming;
+    let baseSpeed = zooming ? 2.4 : 7;
     if (player.sprintT > 0 && !zooming) baseSpeed *= 1.7;
     const speed = baseSpeed * (weapon.moveSpeedMul || 1) * dt, r = player.radius;
     const tryX = player.pos.x + move.x * speed;
@@ -5831,10 +6120,11 @@ function loop() {
     camera.rotation.order = 'YXZ';
     camera.rotation.y = player.yaw;
     camera.rotation.x = player.pitch;
-    const targetFov = zooming ? SNIPER_FOV : BASE_FOV;
-    camera.fov += (targetFov - camera.fov) * 0.2;
+    if (sniperZoomPunch > 0) sniperZoomPunch = Math.max(0, sniperZoomPunch - dt * 4);
+    const targetFov = zooming ? SNIPER_FOV - sniperZoomPunch * 7 : BASE_FOV;
+    camera.fov += (targetFov - camera.fov) * (sniperZoomPunch > 0.1 ? 0.35 : 0.22);
     camera.updateProjectionMatrix();
-    zoomVignette.style.opacity = zooming ? '1' : '0';
+    if (zoomVignette) zoomVignette.style.opacity = '0';
     if (shakeT > 0) {
       camera.position.x += (Math.random()-0.5) * shakeT * 0.15;
       camera.position.y += (Math.random()-0.5) * shakeT * 0.15;
@@ -5869,7 +6159,14 @@ function loop() {
         spawnBullet(start, dir, 'player', weaponId === 'awp', weapon.damage, weapon.bulletSpeed, weaponId === 'minigun', player.team);
         muzzle.intensity = weaponId === 'awp' ? 6 : (weaponId === 'minigun' ? 2 : 4);
         shakeT = weaponId === 'awp' ? 12 : (weaponId === 'minigun' ? 2 : 4);
-        if (weaponId === 'awp') Audio.sniperShot();
+        if (weaponId === 'awp') {
+          if (zooming) {
+            sniperZoomPunch = 1;
+            camera.fov = SNIPER_FOV - 9;
+            camera.updateProjectionMatrix();
+          }
+          Audio.sniperShot();
+        }
         else if (weaponId === 'minigun') Audio.minigunShot();
         else Audio.gunshot(weapon.damage / 60);
         lastShot = 0;
