@@ -5529,7 +5529,83 @@ function startSurvival() {
   if (CONFIG.platform === 'mobile') document.getElementById('mobileControls').classList.add('active');
   else renderer.domElement.requestPointerLock();
 }
+// ================= JUMP PADS =================
+const jumpPads = [];
+const PAD_PUSH_FORCE = 22; // How high they launch you (11 is normal jump)
+const PAD_RADIUS = 1.5;
 
+function spawnJumpPad(x, z) {
+  const g = new THREE.Group();
+  
+  // Base pad
+  const baseMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 3), baseMat);
+  base.position.y = 0.1;
+  base.receiveShadow = true;
+  g.add(base);
+
+  // Glowing top
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xaa66ff });
+  const top = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 2.4), glowMat);
+  top.position.y = 0.25;
+  g.add(top);
+
+  // Chevron/Arrow shape
+  const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const arrow = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 0.4), arrowMat);
+  arrow.position.y = 0.26;
+  g.add(arrow);
+  const arrow2 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.12, 0.3), arrowMat);
+  arrow2.position.set(0, 0.26, -0.6);
+  g.add(arrow2);
+
+  g.position.set(x, 0, z);
+  scene.add(g);
+
+  jumpPads.push({
+    group: g,
+    x: x,
+    z: z,
+    top: top,
+    base: base,
+  });
+}
+
+function updateJumpPads(dt) {
+  if (!Extraction.active) return;
+  
+  const time = performance.now() * 0.005;
+
+  for (const pad of jumpPads) {
+    // Pulse the glow
+    pad.top.material.color.setHSL(0.75, 1.0, 0.5 + Math.sin(time) * 0.2);
+    
+    // Check player
+    const pDist = Math.hypot(player.pos.x - pad.x, player.pos.z - pad.z);
+    if (pDist < PAD_RADIUS && player.pos.y < 1.5) {
+      if (player.vy <= 0) { // Only trigger if falling or standing
+        player.vy = PAD_PUSH_FORCE;
+        player.onGround = false;
+        Audio.jump();
+        shakeT = 4; // small screen shake
+        // Burst effect
+        burst(new THREE.Vector3(pad.x, 0.5, pad.z), 0xaa66ff, 10);
+      }
+    }
+
+    // Check enemies (scavengers)
+    Extraction.enemies.forEach(function(e) {
+      if (e.dead) return;
+      const eDist = Math.hypot(e.group.position.x - pad.x, e.group.position.z - pad.z);
+      if (eDist < PAD_RADIUS && e.group.position.y < 1.0) {
+        // We push them by modifying their y position directly since they don't have a vy physics loop
+        e.group.position.y += 15 * dt; 
+        // Drop a little particle just for fun
+        if (Math.random() < 0.2) burst(e.group.position.clone(), 0xaa66ff, 2);
+      }
+    });
+  }
+}
 // ================= START EXTRACTION =================
 function startExtractionMode() {
   Frontline.active = false;
@@ -5635,7 +5711,21 @@ function startExtractionMode() {
     }
   }
 
+
+    // Spawn Jump Pads
+while (jumpPads.length > 0) {
+    const p = jumpPads.pop();
+    scene.remove(p.group);
+  }
+  // Spawn locations (using map grid coordinates, multiplied by TILE size 3)
+  // These put them in open areas of the extraction map
+  spawnJumpPad(10 * TILE, 30 * TILE); 
+  spawnJumpPad(30 * TILE, 10 * TILE);
+  spawnJumpPad(50 * TILE, 30 * TILE);
+  spawnJumpPad(30 * TILE, 50 * TILE);
+  spawnJumpPad(30 * TILE, 30 * TILE); // Center
   // Spawn scavengers
+
   for (let i = 0; i < MAX_EXTRACTION_ENEMIES; i++) {
     Extraction.enemies.push(createExtractionEnemy());
   }
@@ -5957,7 +6047,10 @@ function loop() {
         }
       }
     }
+
+  
     updateChests(dt);
+    updateJumpPads(dt); // <--- ADD THIS LINE
     // Update scavengers
     Extraction.enemies.forEach(function(e) { updateExtractionEnemy(e, dt); });
   }
