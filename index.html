@@ -3107,95 +3107,41 @@ function buildSCAR() {
 function buildAWP() {
   const g = new THREE.Group();
 
-  // ---- Gun body ----
-  makeBox(0.15, 0.15, 1.35, 0.26, -0.22, -0.8, gunMats.greenGun, g);
+  // --- Body & barrel (all boxes, same dims as before) ---
+  makeBox(0.15, 0.15, 1.35, 0.26, -0.22, -0.8,  gunMats.greenGun, g);
   makeBox(0.07, 0.07, 0.9,  0.26, -0.2,  -1.85, gunMats.metal,    g);
   makeBox(0.13, 0.13, 0.2,  0.26, -0.2,  -2.35, gunMats.dark,     g);
   makeBox(0.10, 0.28, 0.12, 0.26, -0.45, -0.42, gunMats.grip,     g);
 
-  // ---- Scope assembly (aligned along Z = barrel direction) ----
+  // --- Scope assembly (all boxes now, no cylinders) ---
   const scopeY = 0.06;
 
-  const scopeTube = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.075, 0.075, 0.62, 16),
-    gunMats.blackGun
-  );
-  scopeTube.rotation.x = Math.PI / 2;   // <-- THE FIX (was rotation.z)
-  scopeTube.position.set(0.26, scopeY, -0.75);
-  g.add(scopeTube);
+  // Main scope tube — replace the cylinder with a narrow long box
+  makeBox(0.15, 0.15, 0.62, 0.26, scopeY, -0.75, gunMats.blackGun, g);
 
-  const objective = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.098, 0.075, 0.16, 16),
-    gunMats.dark
-  );
-  objective.rotation.x = Math.PI / 2;
-  objective.position.set(0.26, scopeY, -1.14);
-  g.add(objective);
+  // Objective (front) — stepped up box
+  makeBox(0.20, 0.20, 0.16, 0.26, scopeY, -1.14, gunMats.dark, g);
+  // Front lens — flat box facing forward
+  makeBox(0.18, 0.18, 0.02, 0.26, scopeY, -1.221, gunMats.metal, g);
 
-  const frontLens = new THREE.Mesh(
-    new THREE.CircleGeometry(0.092, 20),
-    new THREE.MeshBasicMaterial({ color: 0x2c4a6a })
-  );
-  frontLens.position.set(0.26, scopeY, -1.221);
-  frontLens.rotation.y = Math.PI;
-  g.add(frontLens);
+  // Eyepiece (rear)
+  makeBox(0.16, 0.16, 0.14, 0.26, scopeY, -0.37, gunMats.dark, g);
+  // Rear lens — flat box
+  makeBox(0.17, 0.17, 0.02, 0.26, scopeY, -0.299, gunMats.metal, g);
 
-  const eyepiece = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.075, 0.088, 0.14, 16),
-    gunMats.dark
-  );
-  eyepiece.rotation.x = Math.PI / 2;
-  eyepiece.position.set(0.26, scopeY, -0.37);
-  g.add(eyepiece);
+  // Elevation turret (top)
+  makeBox(0.07, 0.07, 0.10, 0.26, scopeY + 0.11, -0.72, gunMats.dark, g);
 
-  const rearLens = new THREE.Mesh(
-    new THREE.CircleGeometry(0.08, 20),
-    new THREE.MeshBasicMaterial({ color: 0x1a2a3a })
-  );
-  rearLens.position.set(0.26, scopeY, -0.299);
-  g.add(rearLens);
+  // Windage turret (side)
+  makeBox(0.10, 0.07, 0.07, 0.26 + 0.11, scopeY, -0.72, gunMats.dark, g);
 
-  const elevTurret = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.032, 0.032, 0.06, 12),
-    gunMats.dark
-  );
-  elevTurret.position.set(0.26, scopeY + 0.075, -0.72);
-  g.add(elevTurret);
-  const elevCap = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.038, 0.038, 0.015, 12),
-    gunMats.metal
-  );
-  elevCap.position.set(0.26, scopeY + 0.11, -0.72);
-  g.add(elevCap);
+  // Scope mount rings (2 boxes clamped under scope)
+  makeBox(0.06, 0.13, 0.05, 0.26, scopeY - 0.14, -0.55, gunMats.dark, g);
+  makeBox(0.06, 0.13, 0.05, 0.26, scopeY - 0.14, -0.92, gunMats.dark, g);
 
-  const windageTurret = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.028, 0.028, 0.05, 12),
-    gunMats.dark
-  );
-  windageTurret.rotation.z = Math.PI / 2;
-  windageTurret.position.set(0.26 + 0.075 + 0.025, scopeY, -0.72);
-  g.add(windageTurret);
-
-  [-0.55, -0.92].forEach(function(zPos) {
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(0.082, 0.018, 8, 20),
-      gunMats.metal
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.set(0.26, scopeY, zPos);
-    g.add(ring);
-    makeBox(0.055, 0.13, 0.05, 0.26, scopeY - 0.14, zPos, gunMats.dark, g);
-  });
-
+  // Bipod stub
   makeBox(0.04, 0.05, 0.15, 0.26, -0.28, -1.75, gunMats.dark, g);
-  return g;
-}
-function buildGrenadeModel() {
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), new THREE.MeshLambertMaterial({ color: 0x2f4a2a }));
-  body.position.set(0.28, -0.3, -0.5); g.add(body);
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.1,8), new THREE.MeshLambertMaterial({ color: 0x777 }));
-  top.position.set(0.28, -0.16, -0.5); g.add(top);
+
   return g;
 }
 function buildMinigun() {
