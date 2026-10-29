@@ -3144,6 +3144,14 @@ function buildAWP() {
 
   return g;
 }
+function buildGrenadeModel() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), new THREE.MeshLambertMaterial({ color: 0x2f4a2a }));
+  body.position.set(0.28, -0.3, -0.5); g.add(body);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.1,8), new THREE.MeshLambertMaterial({ color: 0x777 }));
+  top.position.set(0.28, -0.16, -0.5); g.add(top);
+  return g;
+}
 function buildMinigun() {
   const g = new THREE.Group();
   makeBox(0.26,0.26,0.7, 0.46,-0.30,-0.60, gunMats.dark, g);
